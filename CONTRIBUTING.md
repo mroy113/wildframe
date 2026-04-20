@@ -88,6 +88,36 @@ Style-only nits on implementation details are lower priority than correctness an
 
 ---
 
+## Versioning and releases
+
+- Wildframe follows **semver**: `v<MAJOR>.<MINOR>.<PATCH>`.
+- Pre-1.0 (current phase): **breaking changes are allowed in minor bumps**. Patch bumps remain backward-compatible.
+- Releases are cut by creating an annotated git tag: `git tag -a v0.1.0 -m "…"` on `main`.
+- A `CHANGELOG.md` entry is required for every tagged release. Keep entries terse and user-facing; development minutiae belong in commit history, not changelog.
+- Model weights, pipeline logic, and XMP schema each have their *own* version fields recorded as provenance per image (see handoff §13) — these are independent of the application version.
+
+---
+
+## Plan change proposals
+
+The handoff document (`bird_photo_ai_project_handoff.md`) is the source of truth, but it is not infallible. If, while working a task, you find a materially better approach than what the plan prescribes, raise it — don't silently deviate.
+
+**Two-PR pattern — required:**
+
+1. **Plan PR first.** Open a PR that modifies only `bird_photo_ai_project_handoff.md` (and, if affected, `docs/BACKLOG.md`). Title: `plan: <short description>`. Body must cover:
+   - **What the plan says today** (quote the relevant passage).
+   - **What you propose to change it to.**
+   - **Why** — tied to the FR/NFR the change better serves. "Cleaner" is not a reason; "reduces maintenance surface per NFR-6 because …" is.
+   - **Blast radius** — which modules, tasks, or prior decisions are affected.
+   - **Alternatives considered and rejected.**
+2. **Implementation PR second.** Only after the plan PR merges. Cite the merged plan PR in the description.
+
+**Scope guard:** plan-change proposals are about *how* to achieve what the plan already says to achieve. Expanding scope ("we should also build X") is a separate backlog addition, not a plan change — open a backlog task with justification instead.
+
+**Never** modify the handoff doc inside an implementation PR to paper over a deviation. That's the one thing this process exists to prevent.
+
+---
+
 ## Dependencies
 
 Net-new third-party dependencies require explicit customer approval. To propose one:

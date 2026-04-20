@@ -77,7 +77,9 @@ A task is not done until **all** of these hold:
 - **On ambiguity, stop and ask.** Do not guess at scope, naming, or behavior. Prefer one clarifying question over three wrong commits.
 - **Never commit model weights.** Use `tools/fetch_models.cmake`. If a test needs a model, the test harness fetches it; it is never checked in.
 - **Never commit secrets, API keys, or anything under `~/` that isn't this repo.**
-- **Never modify `bird_photo_ai_project_handoff.md` to match code.** If reality diverges from the plan, flag it to the user and wait for a decision.
+- **The plan is the source of truth, but it is not infallible.** If, while working a task, you identify a materially better approach than what the plan prescribes — one that better serves the stated goals and NFRs — **stop before implementing** and propose the plan change to the user. Do not silently deviate, and do not edit the handoff doc unilaterally. Wait for approval, then proceed via the two-step process in `CONTRIBUTING.md` (update plan → implement).
+- **Scope the judgment.** Plan-change proposals are about *how* to achieve what the plan already says to achieve. They are **not** license to expand scope. "I think we should also build X" is scope creep, not a plan improvement, and belongs as a separate backlog addition with justification — never smuggled in under "making the best product."
+- **Never modify `bird_photo_ai_project_handoff.md` to match code reality.** If reality has drifted from the plan without explicit approval, that's a bug in the code, not the plan. Flag it and wait for a decision.
 - **Do not introduce new dependencies** without adding them to `vcpkg.json` and updating `docs/LICENSING.md`. Net-new dependencies require user approval.
 - **Do not exceed module responsibilities.** If a task in module X requires a change in module Y, open a separate task for Y rather than quietly editing across boundaries.
 - **Prefer readability over cleverness.** See NFR-6. If you're reaching for SFINAE, CRTP, or heavy templates, stop and consider a concrete alternative first.
@@ -106,7 +108,40 @@ When starting a task:
 1. Read the task in `docs/BACKLOG.md`. Note its dependencies and acceptance criteria.
 2. Verify dependencies are complete (their tasks are checked off). If not, stop.
 3. Re-read the relevant FR/NFR from the handoff doc.
-4. Create a branch per `CONTRIBUTING.md`.
-5. Implement. Run format, tidy, and tests locally. Iterate until clean.
-6. Open a PR citing FR/NFR and task ID.
-7. Mark the backlog item complete **only after** the PR is merged.
+4. **Judgment gate.** Before writing code, ask: does the plan's prescribed approach still look like the best way to satisfy the cited FR/NFR? If you see a materially better approach, stop and propose the plan change per §5. If the prescribed approach is fine, proceed.
+5. Create a branch per `CONTRIBUTING.md`.
+6. Implement. Run format, tidy, and tests locally. Iterate until clean.
+7. Open a PR citing FR/NFR and task ID.
+8. Mark the backlog item complete **only after** the PR is merged.
+
+---
+
+## 8. Project health reviews
+
+At milestones (Sprint 0 complete, each module complete, phase transitions, or any time something feels off), run a structured project health review.
+
+**How to trigger:**
+
+- Inside a Claude Code session: `/review <milestone-name>` (defined in `.claude/commands/review.md`).
+- Or paste the trigger prompt below into a **fresh conversation**.
+
+**Where output lives:**
+
+- `docs/reviews/<YYYY-MM-DD>-<milestone-slug>.md`, following `docs/REVIEW_TEMPLATE.md`.
+- Committed to the repo for audit trail.
+
+**Scope rules for reviewing agents:**
+
+- **Read-only.** Never modify code, never stage, never commit. Only write the new review file.
+- **Propose, don't re-plan.** The handoff doc is the source of truth; surface deviation, don't redesign.
+- **Cite evidence.** Every NFR claim, every backlog change, every dep proposal must point to a file:line, benchmark number, or specific finding.
+- **Default reject on new deps.** Per NFR-6, new dependencies must clearly reduce maintenance surface to be worth adopting.
+
+**Trigger prompt (paste into a fresh conversation):**
+
+> You are performing a project health review of Wildframe at the milestone: `<milestone-name>`.
+> Read `bird_photo_ai_project_handoff.md`, `CLAUDE.md`, `docs/BACKLOG.md`, `docs/REVIEW_TEMPLATE.md`, and any prior files in `docs/reviews/`.
+> Examine the current codebase read-only. Produce a filled-in review at `docs/reviews/<YYYY-MM-DD>-<milestone-slug>.md` following the template exactly.
+> You may use web search to assess dependency candidates (§2 of the template).
+> Do not modify any file other than the new review file. Do not stage or commit.
+> When done, reply with the path to the review file and the top three findings (one sentence each, tagged `critical` / `concern` / `fyi`).

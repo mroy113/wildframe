@@ -96,10 +96,63 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Jobs: configure + build (debug and release), run `ctest`, run format-check, run clang-tidy gate. All required to pass before merge. Cache vcpkg and `build/_models/`.
 
 - [ ] **S0-14** — spdlog global logger initialization
-  - Deps: S0-02, S0-03
+  - Deps: S0-02, S0-03, S0-17
   - Size: S
   - Satisfies: NFR-5 (auditability)
-  - Define a `wildframe_log` library or inline header in `wildframe_orchestrator` providing a configured spdlog sink (stdout + rotating file). Log format includes timestamp, level, and module tag.
+  - Define a `wildframe_log` library or inline header in `wildframe_orchestrator` providing a configured spdlog sink (stdout + rotating file). Log format includes timestamp, level, and module tag. Level thresholds and destinations per S0-17.
+
+- [ ] **S0-15** — Developer environment bootstrap
+  - Deps: S0-01, S0-02
+  - Size: M
+  - Satisfies: NFR-6 (maintainability)
+  - `docs/DEV_SETUP.md` + a `tools/bootstrap.sh` script covering: Xcode command-line tools, Homebrew, CMake ≥3.24, Ninja, vcpkg clone + bootstrap (pinned to a specific commit for reproducibility), first `cmake --preset debug` + build. Must take a clean macOS machine to "first build passing" with one command.
+
+- [ ] **S0-16** — User-facing README.md
+  - Deps: S0-01
+  - Size: S
+  - Satisfies: NFR-6
+  - Repo-root `README.md` that explains what Wildframe is, who it's for, how to build and run it, and where to find deeper docs. Must document:
+    - Supported platform (macOS 13+, Apple Silicon recommended).
+    - Where XMP sidecars are written (next to the RAW file).
+    - Where batch JSON manifests are written (`~/Library/Application Support/Wildframe/batches/`).
+    - Where application logs are written (`~/Library/Logs/Wildframe/wildframe.log`, daily rotation, 14-day retention).
+    - How to override any of these via the TOML config (pointer to `docs/CONFIG.md`).
+    - How to build (pointer to `docs/DEV_SETUP.md`).
+  - Separate from `CLAUDE.md` (agent-facing) and `CONTRIBUTING.md` (contributor-facing). Initial sections can be stubs, filled in as modules land.
+
+- [ ] **S0-17** — Logging policy
+  - Deps: S0-01
+  - Size: S
+  - Satisfies: NFR-5
+  - Section added to `docs/STYLE.md` specifying: level semantics (trace/debug/info/warn/error/critical), when to use each, default level for release vs debug builds, log file path and rotation policy (consumes S0-19 output), module tag conventions. Agents follow this spec when adding log lines.
+
+- [ ] **S0-18** — TOML runtime config specification
+  - Deps: S0-01, S0-02
+  - Size: M
+  - Satisfies: FR-11
+  - `docs/CONFIG.md` documenting every configurable field: name, type, range, default, which FR/NFR it relates to. Ship a fully-commented default `data/config.default.toml`. Specify the resolution order (CLI arg → XDG path → built-in default). Config is startup-only for MVP — no hot-reload.
+
+- [ ] **S0-19** — Output path implementation
+  - Deps: S0-18
+  - Size: S
+  - Satisfies: FR-5, FR-11
+  - **Locked defaults:**
+    - spdlog application log: `~/Library/Logs/Wildframe/wildframe.log` with daily rotation, 14-day retention.
+    - Batch JSON manifest: `~/Library/Application Support/Wildframe/batches/<ISO-8601-timestamp>.json`.
+    - Both paths are overridable via TOML config keys `log_path` and `manifest_dir`.
+  - Implement path-resolution helpers. Record in `docs/CONFIG.md`. Cross-link from `README.md` (see S0-16).
+
+- [ ] **S0-20** — macOS deployment target + toolchain minimums
+  - Deps: S0-01
+  - Size: S
+  - Satisfies: NFR-6 (reproducibility), §3 (platform)
+  - **Decided:** minimum macOS **13 (Ventura)**. Minimum Apple Clang: 15. Minimum CMake: 3.24. Ninja required. vcpkg pinned to a specific commit. Enforced by top-level `CMakeLists.txt` via `CMAKE_OSX_DEPLOYMENT_TARGET=13.0` and compiler version check. Record in `docs/DEV_SETUP.md`.
+
+- [ ] **S0-21** — Re-analysis behavior
+  - Deps: S0-01, M5-09
+  - Size: S
+  - Satisfies: FR-10
+  - **Decided:** default is **prompt-per-batch** with three batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and a per-file override available from the detail view. Chosen option recorded in the batch manifest and on each affected sidecar via `wildframe_user:reanalysis_policy_used`. Overridable via TOML config key `reanalysis_default` for headless/automated runs.
 
 ---
 
@@ -366,6 +419,12 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-6
   - Integration test: run the full pipeline over all S0-12 fixtures, verify all produced XMP sidecars and the batch manifest.
 
+- [ ] **M6-08** — Cooperative batch cancellation
+  - Deps: M6-03
+  - Size: M
+  - Satisfies: FR-9
+  - Orchestrator exposes a `cancel()` method. When set, the worker finishes the current per-image step, writes any partial output for that image if stage boundaries allow, stops dispatching new work, records `status: cancelled` in the manifest, and returns. No forceful thread termination.
+
 ---
 
 ## Module 7 — `wildframe_gui` (FR-6)
@@ -416,6 +475,18 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Size: M
   - Satisfies: NFR-6
   - GoogleTest covers: filter predicates, thumbnail model population, override state machine. Widget rendering itself is not unit-tested in MVP.
+
+- [ ] **M7-09** — Cancel button and progress wiring
+  - Deps: M7-03, M6-08
+  - Size: S
+  - Satisfies: FR-9
+  - Cancel button in the progress view invokes the orchestrator's `cancel()`. UI reflects `cancelling…` state until the worker confirms completion, then shows partial-results summary.
+
+- [ ] **M7-10** — Re-analysis prompt dialog
+  - Deps: M7-01, M5-09, S0-21
+  - Size: M
+  - Satisfies: FR-10
+  - On batch start, scan for existing `wildframe:*` sidecars. If any exist, show modal with three options (skip already-analyzed, overwrite all, cancel) and a count of how many files are affected. Per-file override is exposed later from the detail view (part of M7-07). Decision recorded to manifest and `wildframe_user:reanalysis_policy_used`.
 
 ---
 

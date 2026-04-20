@@ -91,6 +91,11 @@ Transform large bird-photo libraries into searchable, metadata-rich collections.
 - Real-time / in-camera operation.
 - Mobile support.
 - Windows / Linux support in v1 (code must not obstruct future ports).
+- Telemetry, analytics, or crash reporting of any kind — Wildframe is fully local; the only network activity is model weight download at build time.
+- Auto-update mechanism.
+- Installer, code signing, or notarization — delivery is source code, not a distributable macOS binary.
+- Internationalization / localization (English only).
+- Accessibility features beyond Qt's defaults.
 
 ---
 
@@ -107,7 +112,8 @@ Transform large bird-photo libraries into searchable, metadata-rich collections.
 | Image processing + classical focus metrics | **OpenCV** | Laplacian variance, FFT, colorspace, crop/resize. |
 | ML inference | **ONNX Runtime (C++ API)** | Loads `.onnx` files. CPU EP baseline, CoreML EP for GPU / Neural Engine acceleration. |
 | GUI | **Qt 6 Widgets** | Not QML. Familiar to industrial/embedded developers. |
-| JSON | **nlohmann/json** | Header-only, de facto. |
+| JSON | **nlohmann/json** | Header-only, de facto. Used for batch manifests. |
+| TOML (runtime config) | **tomlplusplus** | Header-only, C++17+, vcpkg-available, clang-tidy-clean. Used for the user-facing runtime configuration file (keeper-score weights, detection thresholds, EP selection, output paths). |
 | Logging | **spdlog** | Chosen over Boost.Log to avoid pulling in the Boost ecosystem for one feature. Smaller surface area, better clang-tidy profile, faster. |
 | Testing | **GoogleTest** | Per-module test targets. |
 | Formatting | **clang-format** | Enforced in CI. |
@@ -197,6 +203,23 @@ Future integration (Phase 3+): the Wildframe GUI may invoke raw-ingest as a subp
 ### FR-8: Search/filter foundation
 - XMP field names and types must be documented and stable so external tools (Lightroom smart collections, etc.) can filter on them.
 
+### FR-9: Batch cancellation
+- The user can cancel an in-progress batch from the GUI.
+- Cancellation is **cooperative**, not forceful — the currently executing per-image pipeline stage finishes its step, then the orchestrator stops dispatching new work.
+- Partial results already written (XMP sidecars, manifest rows) are retained. No rollback of successfully written sidecars.
+- The batch JSON manifest's final status is recorded as `cancelled` with a cancellation timestamp.
+
+### FR-10: Re-analysis policy
+- When the user runs analysis on a directory that already contains `wildframe:*` XMP sidecars from a prior run, Wildframe must not silently overwrite them.
+- Default behavior (subject to customer confirmation in Sprint 0): prompt the user with batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and allow per-file override from the detail view.
+- The chosen option is recorded in the batch manifest so re-runs are traceable.
+
+### FR-11: Runtime configuration
+- All user-tunable values (keeper-score weights, detection confidence threshold, NMS IoU threshold, recursion depth, detector selection, execution provider selection, output paths) live in a single **TOML** configuration file loaded at application startup.
+- File location is resolved in order: CLI `--config <path>` argument, then `$XDG_CONFIG_HOME/wildframe/config.toml` (or macOS equivalent), then a built-in default.
+- The application ships with a fully-commented default config file documenting every field.
+- Config is **startup-only** for MVP — no hot-reload.
+
 ---
 
 ## 9. Non-Functional Requirements
@@ -254,6 +277,15 @@ Future integration (Phase 3+): the Wildframe GUI may invoke raw-ingest as a subp
   - For every legitimate finding, the developer must first consider at least one alternative implementation that eliminates the finding. **Suppression of a legitimate finding is a last resort, not a default.**
   - Only confirmed false positives may be suppressed, and the suppression comment must describe why it is a false positive.
 - CI rejects any PR that introduces new clang-tidy findings or new unexplained suppressions.
+
+### NFR-9: Thread safety contracts
+
+- Each module's public header must document the concurrency contract of its API. Allowed contracts:
+  - **single-threaded** — must be called from one thread; caller is responsible.
+  - **thread-compatible** — distinct instances may be used from distinct threads; a single instance must not.
+  - **thread-safe** — instance may be used concurrently from multiple threads.
+- The GUI must not call single-threaded or thread-compatible modules from a thread other than the one the instance was created on. Violations are caught by `assert`s in debug builds.
+- `wildframe_metadata` XMP reads (for GUI thumbnail population) and writes (for orchestrator pipeline output) may race; the module documents and enforces its own serialization strategy.
 
 ---
 
@@ -386,7 +418,11 @@ ONNX model weights are **not committed to the repository**. The `tools/fetch_mod
 - `analysis_timestamp`, `pipeline_version`, `detector_model_name`, `detector_model_version`, `focus_algorithm_version`.
 
 ### User override (namespace `wildframe_user:`)
-- `bird_present_override`, `keeper_override` (approved/rejected), `user_note`, `override_timestamp`.
+- `bird_present_override` (enum: `Present`, `Absent`, `Unset` — default `Unset`).
+- `keeper_override` (enum: `Approved`, `Rejected`, `Unset` — default `Unset`).
+- `user_note` (string, optional).
+- `override_timestamp` (ISO-8601 timestamp of the most recent user change).
+- `reanalysis_policy_used` (enum: `PromptSkipped`, `PromptOverwrote`, `PerFile` — recorded when a re-analysis affected this file; see FR-10).
 
 ---
 
@@ -442,6 +478,11 @@ ONNX model weights are **not committed to the repository**. The `tools/fetch_mod
 19. **C++20** locked (no C++17 fallback).
 20. **Exceptions allowed** per Core Guidelines, with policy formalized in `docs/STYLE.md`; third-party exceptions translated at module boundaries.
 21. Logging: **spdlog** (Boost.Log considered and rejected to avoid pulling in Boost solely for logging).
+22. Runtime config file format: **TOML** via tomlplusplus.
+23. Wildframe versioning: **semver**, git-tagged `v<MAJOR>.<MINOR>.<PATCH>`. Pre-1.0: breaking changes allowed in minor bumps.
+24. macOS deployment target: **macOS 13 (Ventura)** minimum. Toolchain: Apple Clang ≥ 15, CMake ≥ 3.24, Ninja, vcpkg pinned commit.
+25. Output paths (overridable via TOML): spdlog logs → `~/Library/Logs/Wildframe/wildframe.log` (daily rotation, 14-day retention); batch JSON manifests → `~/Library/Application Support/Wildframe/batches/<timestamp>.json`.
+26. Re-analysis default: **prompt per batch** (*skip already-analyzed* / *overwrite all* / *cancel*), with per-file override available from the detail view.
 
 ---
 
@@ -454,7 +495,7 @@ This document is ready to be decomposed into development tasks. The planning age
 3. Identify the critical path: `wildframe_ingest` → `wildframe_raw` → `wildframe_detect` → `wildframe_focus` → `wildframe_metadata` → `wildframe_orchestrator` → `wildframe_gui`.
 4. Schedule **Sprint 0** tasks before any module work:
    - Pitchfork directory scaffold (Section 11).
-   - `vcpkg.json` manifest with pinned versions of LibRaw, Exiv2, OpenCV, ONNX Runtime, Qt 6, nlohmann/json, spdlog, GoogleTest.
+   - `vcpkg.json` manifest with pinned versions of LibRaw, Exiv2, OpenCV, ONNX Runtime, Qt 6, nlohmann/json, tomlplusplus, spdlog, GoogleTest.
    - Top-level `CMakeLists.txt` with one empty static-lib target per module, plus the GUI executable target.
    - `CMakePresets.json` for debug, release, tidy (clang-tidy run), and asan.
    - `.clang-format` baseline derived from Google style.
