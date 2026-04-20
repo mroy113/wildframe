@@ -1,0 +1,16 @@
+# Build output
+build/
+
+# Model weights fetched at configure time (see tools/fetch_models.cmake).
+# Redundant with build/ above, but listed explicitly per the S0-01 spec.
+build/_models/
+
+# macOS
+.DS_Store
+
+# IDE / editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
