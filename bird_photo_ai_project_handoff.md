@@ -1,627 +1,468 @@
 ---
 document_type: project_handoff
-project_name: bird-photo-ai-metadata-engine
-status: concept_and_mvp_planning
+project_name: wildframe
+status: mvp_ready_for_decomposition
 primary_goal: >
-  Build an AI-assisted application that analyzes RAW bird photos, generates useful metadata,
-  and integrates with an existing photo workflow, likely Lightroom Classic.
+  Build Wildframe, an AI-assisted desktop application that analyzes RAW bird photos,
+  generates useful metadata for culling and search, and integrates with existing
+  photo workflows (Lightroom Classic).
 intended_recipient: software_project_planning_agent
 source_context: >
-  Derived from user discussion about bird-photo culling, RAW workflows, Lightroom/DxO/Photo Mechanic,
-  and interest in extending metadata beyond culling to species and related AI-enriched annotations.
+  Derived from customer/engineering scoping conversation. Defines a C++ source-code
+  deliverable targeting an average-skilled embedded C++ developer as the maintainer.
+  Maintainability is the primary non-functional concern for every decision.
 ---
 
-# Project Handoff: AI-Assisted Bird Photo Metadata and Culling System
+# Project Handoff: Wildframe — AI-Assisted Bird Photo Metadata Engine
 
 ## 1. Executive Summary
 
-Build a system that analyzes folders or selections of RAW bird photographs and writes back useful metadata for culling, search, and later workflow automation.
+Wildframe is a desktop application that analyzes folders of RAW bird photographs and writes back useful metadata for culling, search, and later workflow automation.
 
-The initial user need is not generic photo editing. The initial user need is:
+The MVP user need is:
 
 1. Detect whether a bird is present in the frame.
 2. Determine whether the bird is in focus.
+3. Produce a keeper score that helps triage a burst-heavy shoot.
 
-The broader product direction is to treat image analysis as a metadata enrichment pipeline, not just a pass/fail culling tool. Once the system can reliably detect and crop birds, it should be able to attach richer metadata such as likely species, bird count, action/context tags, and image quality scores.
-
-The most practical implementation is:
-
-- a standalone analysis engine for computer vision / AI
-- plus a thin integration layer for an existing photo workflow application, most likely Lightroom Classic
-
-This keeps the AI stack flexible while still supporting real-world photo workflows.
+The broader product direction is to treat image analysis as a metadata enrichment pipeline, not a pass/fail culling tool. Once the system can reliably detect and crop birds, it can attach richer metadata — species, counts, action/context tags, quality scores — via additional pipeline stages.
 
 ---
 
 ## 2. Product Vision
 
-### Core product idea
-
-An AI-assisted wildlife photo intelligence tool focused first on birds.
+### Core product
+AI-assisted wildlife photo intelligence tool focused first on birds.
 
 ### Initial value proposition
-
-Given a set of RAW photos, automatically infer structured metadata that helps with:
-
-- culling
-- filtering
-- search
-- ranking
-- species-oriented organization
+Given a directory of RAW photos, automatically infer structured metadata that supports culling, filtering, ranking, and later species/context search.
 
 ### Long-term value proposition
-
-Transform large bird-photo libraries into searchable, metadata-rich collections that support queries like:
-
-- show me sharp in-flight photos
-- show me likely warblers from this trip
-- show me all high-confidence osprey photos over water
-- show me the best image from each burst
-- show me photos that likely match an eBird checklist in place/time
+Transform large bird-photo libraries into searchable, metadata-rich collections. Example future queries:
+- sharp in-flight photos
+- likely warblers from this trip
+- high-confidence osprey over water
+- best image from each burst
+- photos that likely match an eBird checklist by place/time
 
 ---
 
-## 3. Scope
+## 3. Delivery Model
 
-## In scope for MVP
+**Wildframe is delivered as C++ source code to a customer whose engineering team is an average-skilled C++ developer with mostly embedded experience.** That audience shapes every downstream choice:
 
-- Analyze a folder or selected set of RAW images
-- Detect whether a bird is present
-- Produce at least one bird bounding box when a bird is present
-- Estimate whether the primary bird subject is in focus
-- Produce machine-readable metadata outputs
-- Support manual review of outputs
-- Write metadata to sidecar or catalog-compatible structures
-- Support later host-app integration, likely Lightroom Classic
+- CMake build system with vcpkg dependency management (manifest mode, pinned versions).
+- Pitchfork repository layout (see Section 11) — no local conventions to learn.
+- Zero framework magic — standard headers, standard idioms, minimal template metaprogramming.
+- Each internal module compiled as a static library with a small, documented header surface.
+- LLDB is the primary debugger; debug builds preserve symbols across static library boundaries so the debugger can step through calls into any module.
+- Zero Python in the shipped product. All ML inference is performed by C++ code loading pre-trained `.onnx` model files.
+- Third-party dependencies are all well-established, CMake-integrated, and available in vcpkg.
 
-## Out of scope for MVP
-
-- Full image editing
-- Full DAM/catalog replacement
-- Perfect species identification
-- Fine-grained age/sex/plumage classification
-- Guaranteed scientific correctness
-- Real-time in-camera operation
-- Full mobile app support
+### Primary platform
+- **macOS, Intel silicon** for initial development (customer's current hardware).
+- **macOS, Apple Silicon** as the primary performance target for release. The architecture must be device-agnostic so the switch is a runtime config change, not a port.
 
 ---
 
-## 4. Primary User Goals
+## 4. Scope
 
-### User goals
+### In scope for MVP
+- Analyze a user-chosen directory of RAW images.
+- **CR3 format only** for MVP (LibRaw's API generalizes to additional formats later with no code change).
+- Detect whether one or more birds are present; output bounding boxes and confidences.
+- Estimate focus / motion blur on the primary bird subject.
+- Produce a composite keeper score.
+- Write per-image metadata to XMP sidecars next to the RAW files.
+- Write a per-batch JSON manifest capturing the analysis run and provenance.
+- Provide a Qt GUI for selecting directories, running analysis, reviewing results, filtering to likely keepers / likely no-bird frames, and overriding AI outputs.
 
-- Reduce time spent manually culling large burst-heavy bird photo sets
-- Avoid keeping obvious non-bird frames
-- Surface likely sharp keepers faster
-- Add searchable species and context metadata
-- Preserve compatibility with existing RAW editing workflow
-
-### Workflow assumptions
-
-- User likely works with RAW bird photos in bulk
-- User may already use Lightroom, DxO, or other desktop editing tools
-- User values metadata enrichment beyond simple keep/reject
-- User is technically capable and may build custom software or plugins
+### Out of scope for MVP
+- RAW formats other than CR3 (CR2, NEF, ARW, RAF, ORF, RW2, DNG — Phase 2).
+- Species identification (Phase 2).
+- Eye/head-specific focus scoring (Phase 2).
+- Action/context tags — in-flight, perched, feeding, etc. (Phase 2+).
+- Obstruction detection (Phase 2+).
+- Burst deduplication / best-of-burst ranking (Phase 4).
+- Lightroom Classic plugin (Phase 3).
+- raw-ingest subprocess integration in the GUI (Phase 3).
+- Custom model training — requires Python sidecar (Phase 2).
+- Full image editing or DAM replacement.
+- Real-time / in-camera operation.
+- Mobile support.
+- Windows / Linux support in v1 (code must not obstruct future ports).
 
 ---
 
-## 5. High-Level Requirements
+## 5. Technology Stack
 
-## Functional requirements
+| Concern | Choice | Notes |
+|---|---|---|
+| Language | **C++20** | Locked. Exceptions allowed and expected; see exception policy in `docs/STYLE.md`. |
+| Build | CMake (≥3.24) | Per-module `add_library(... STATIC ...)`. |
+| Dependencies | vcpkg | Manifest mode, pinned versions, reproducible from clean checkout. |
+| Repository layout | **Pitchfork** | See Section 11. |
+| RAW decode + embedded preview extraction | **LibRaw** | MVP uses CR3; LibRaw handles the others for Phase 2. |
+| EXIF read + XMP sidecar write | **Exiv2** | C++ native. One library covers deterministic metadata reads and sidecar writes. |
+| Image processing + classical focus metrics | **OpenCV** | Laplacian variance, FFT, colorspace, crop/resize. |
+| ML inference | **ONNX Runtime (C++ API)** | Loads `.onnx` files. CPU EP baseline, CoreML EP for GPU / Neural Engine acceleration. |
+| GUI | **Qt 6 Widgets** | Not QML. Familiar to industrial/embedded developers. |
+| JSON | **nlohmann/json** | Header-only, de facto. |
+| Logging | **spdlog** | Chosen over Boost.Log to avoid pulling in the Boost ecosystem for one feature. Smaller surface area, better clang-tidy profile, faster. |
+| Testing | **GoogleTest** | Per-module test targets. |
+| Formatting | **clang-format** | Enforced in CI. |
+| Static analysis | **clang-tidy** | Zero findings required. See NFR-8. |
+| Debugger | **LLDB** | macOS native. |
+
+### GPU / acceleration strategy
+
+MVP uses **ONNX Runtime with the CoreML Execution Provider**. This provider dispatches to:
+- **Intel Mac**: Metal-backed GPU (discrete AMD where present, Intel integrated otherwise), CPU fallback.
+- **Apple Silicon**: Apple Neural Engine + GPU + CPU, managed by CoreML.
+
+No code change is required when moving between machines — EP selection is a runtime flag. CPU EP remains the fallback for debugging and machines where CoreML is unavailable.
+
+Classical CV work (focus scoring, FFT) stays on CPU via OpenCV. If benchmarking identifies a hotspot, OpenCV's OpenCL backend can be wired in without changing call sites.
+
+### Threading strategy (MVP)
+
+- Qt main thread owns the UI.
+- A single background worker thread owns the analysis pipeline and drains a job queue.
+- ONNX Runtime handles intra-op parallelism and GPU dispatch internally; no per-image application-level threading in v1.
+- If throughput becomes a bottleneck, a producer–consumer pipeline (decode → infer → score → write) can be added without changing module boundaries.
+
+---
+
+## 6. Relationship to raw-ingest
+
+`raw-ingest` is a separate Python CLI tool at `~/Code/raw-ingest` that the customer already owns. It offloads SD cards into a date+location-structured library under `~/Pictures/`, writes per-run JSON manifests, and integrates with eBird for location suggestions.
+
+**Wildframe is loosely coupled to raw-ingest.** Wildframe's input contract is *a directory containing RAW files* — nothing more. It does not parse raw-ingest manifests, does not depend on raw-ingest's library layout, and does not require raw-ingest to run.
+
+Future integration (Phase 3+): the Wildframe GUI may invoke raw-ingest as a subprocess to offer an "ingest then analyze" flow. That integration is out of scope for MVP.
+
+---
+
+## 7. Primary User Goals
+
+- Reduce time spent manually culling large burst-heavy bird photo sets.
+- Avoid keeping obvious non-bird frames.
+- Surface likely sharp keepers faster.
+- Produce metadata that supports future search / filtering workflows.
+- Preserve compatibility with the existing RAW editing workflow (Lightroom, DxO, Photo Mechanic).
+
+---
+
+## 8. Functional Requirements
 
 ### FR-1: Input handling
-- System must ingest folders or selected image sets containing RAW files.
-- System should support common bird-photography RAW formats, starting with Canon CR3/CR2 and extensible to other formats.
-- System should preserve original image files and avoid destructive changes.
+- Accept a user-selected directory. Recurse one level by default (configurable).
+- **MVP supports Canon CR3 only.** LibRaw's API is format-agnostic, so extending to CR2/NEF/ARW/RAF/ORF/RW2/DNG in Phase 2 is an acceptance-test change, not a code change.
+- Never modify or overwrite source RAW files. All writes are sidecar or separate output files.
 
-### FR-2: Bird presence detection
-- System must determine whether one or more birds are present in an image.
-- System should output bounding boxes for detected birds.
-- System should distinguish between no bird, likely bird, and high-confidence bird.
+### FR-2: Preview extraction
+- For each RAW file, extract the largest embedded JPEG preview via LibRaw for fast inference.
+- Full-resolution RAW decode is used only when the primary subject bbox is small enough that classical focus metrics benefit from higher resolution.
 
-### FR-3: Focus assessment
-- System must estimate whether the primary bird subject is acceptably in focus.
-- System should score subject sharpness based on the bird crop rather than whole-image sharpness.
-- System should prefer bird/head/eye sharpness over global image quality.
+### FR-3: Bird presence detection
+- Run ONNX-backed object detection on the preview image.
+- Produce: `bird_present` (bool), `bird_count` (int), `bird_boxes[]` (xywh + per-box confidence), `detection_confidence` (max confidence across boxes).
+- Select a `primary_subject_box` by max confidence; ties broken by bbox area.
 
-### FR-4: Metadata generation
-- System must generate structured metadata for each image.
-- Metadata should include at minimum:
-  - bird_present
-  - bird_count
-  - bird_boxes
-  - primary_subject_focus_score
-  - keeper_score
-- System should support richer metadata such as:
-  - species top-k predictions
-  - confidence values
-  - action/context tags
-  - motion blur score
-  - obstruction score
-  - eye-visible flag
-  - subject-size estimate
+### FR-4: Focus and quality scoring
+- Crop the preview (or a RAW-decoded region if preview resolution is insufficient) to the primary subject box.
+- Compute:
+  - `focus_score` — normalized variance of Laplacian on the bird crop.
+  - `motion_blur_score` — FFT high-frequency energy ratio.
+  - `subject_size_percent` — bbox area / image area.
+- Combine into a `keeper_score` via a documented, tunable weighted formula. Penalize edge clipping.
 
-### FR-5: Output persistence
-- System must persist metadata in a form usable by downstream tools.
-- System should support one or more of:
-  - XMP sidecar output
-  - Lightroom custom metadata
-  - JSON manifest per batch
-  - SQLite/Postgres metadata store for internal app use
+### FR-5: Metadata generation and persistence
+- Write one XMP sidecar per analyzed RAW file (`photo.CR3.xmp`) containing:
+  - AI metadata (detection + focus/keeper scores).
+  - Provenance (model name, model version, pipeline version, analysis timestamp).
+  - Namespaced custom fields (`wildframe:*`) for anything outside standard XMP.
+- Write one per-batch JSON manifest to a run-scoped folder capturing every image processed, inputs, outputs, errors, and timing.
+- **XMP sidecars are the source of truth.** The JSON manifest is an append-only run log.
 
-### FR-6: Review and override
-- System should allow human review and correction of model outputs.
-- System should allow manual override of species or quality results.
-- System should preserve provenance of AI-generated vs user-corrected metadata.
+### FR-6: Review and override (MVP minimum)
+- GUI shows the analyzed batch as a thumbnail grid with filters: keeper-score range, bird-present toggle, detection-confidence range.
+- Clicking a thumbnail opens a detail view showing the preview, drawn bbox, and scores.
+- User can override `bird_present` and mark approve/reject; user can add a free-text note.
+- Overrides are written back to the XMP sidecar under a distinct namespace (`wildframe_user:*`) so AI-generated vs user-corrected values remain separable.
 
-### FR-7: Host app integration
-- System should be designed so a host app integration layer can invoke analysis on selected photos.
-- Likely first host: Lightroom Classic.
-- Integration should support sending selected photos for analysis and writing results back as metadata, labels, flags, or ratings.
+### FR-7: Host app integration (deferred)
+- Not built in MVP. Module boundaries must leave room for a future Lightroom Classic plugin layer.
 
-### FR-8: Search and filtering foundation
-- Metadata should be structured to support later search use cases such as:
-  - species filtering
-  - in-flight vs perched
-  - keeper ranking
-  - best-of-burst selection
-  - date/location-aware species reranking
+### FR-8: Search/filter foundation
+- XMP field names and types must be documented and stable so external tools (Lightroom smart collections, etc.) can filter on them.
 
 ---
 
-## Non-functional requirements
+## 9. Non-Functional Requirements
 
 ### NFR-1: Performance
-- The system should be reasonably fast on large batches.
-- The design should support use of embedded JPEG previews or reduced-resolution preview paths for early-stage detection to improve speed.
+- A batch of 500 preview-path images should complete detection + focus scoring in under 10 minutes on Intel Mac CPU, under 2 minutes on Apple Silicon with CoreML EP. Targets, not hard budgets.
 
 ### NFR-2: Accuracy
-- Bird detection and focus scoring must be useful enough to save time, even if imperfect.
-- False negatives on strong keeper images should be minimized.
-- Confidence outputs should be exposed rather than hidden.
+- False-negatives on clearly sharp bird frames must be rare. False-positives on birdless frames are acceptable and fixable via the review UI.
+- Confidence values must be exposed in the UI and in metadata, not hidden.
 
 ### NFR-3: Extensibility
-- The system must allow additional AI metadata tasks later without redesigning the core pipeline.
-- New models should be addable as independent pipeline stages.
+- New pipeline stages (species, action tags, eye detection) must be addable by implementing a documented C++ interface and registering the stage with the orchestrator — no changes to the orchestrator core.
 
 ### NFR-4: Interoperability
-- The system should preserve compatibility with existing photo workflows and metadata standards where possible.
-- Standard metadata fields should be used when appropriate; custom metadata should be namespaced and documented.
+- XMP field names follow Adobe XMP conventions where they overlap with standard properties. Custom fields are namespaced under `wildframe:` and documented in `docs/METADATA.md`.
 
 ### NFR-5: Auditability
-- Outputs should be traceable to model versions and analysis runs.
-- Metadata should include enough provenance to debug bad predictions.
+- Every written metadata record includes pipeline version, per-stage model name and version, and analysis timestamp.
+
+### NFR-6: Maintainability (**primary** non-functional concern)
+
+**Maintainability is the primary consideration for every development decision in Wildframe.** Where a choice trades readability for performance, cleverness, or brevity, readability wins unless a benchmark proves the trade is required.
+
+- Prefer **self-documenting code**: descriptive variable and function names, small functions, obvious control flow. A reader should rarely need a comment to understand *what* the code is doing.
+- Do **not overuse advanced C++ features** — SFINAE, CRTP, expression templates, custom allocators, heavy template metaprogramming, operator overloading beyond arithmetic types, fold expressions in hot paths — when a straightforward implementation is clear and adequate.
+- Prefer concrete types over clever generic ones. Template only where genuinely reusable.
+- Each module kept under ~2000 lines of implementation where practical.
+- Headers carry brief Doxygen-style comments on public interfaces only. Implementation comments explain *why*, never *what*.
+- GoogleTest coverage for every module-public interface.
+
+### NFR-7: Code Standards
+
+- **Strict adherence to the C++ Core Guidelines** — https://isocpp.github.io/CppCoreGuidelines/
+- **Strict adherence to the Google C++ Style Guide** — https://google.github.io/styleguide/cppguide.html
+- Where the two documents disagree, the project maintains `docs/STYLE.md` recording which guide wins on the disputed point and why. Every such exception is listed there. Typical disputed points include exception policy, header ordering, and smart-pointer conventions — resolve them at kickoff.
+- **Exception policy** (to be formalized in `docs/STYLE.md` at kickoff):
+  - Exceptions are allowed and expected, following Core Guidelines (E-series) rather than the historical Google ban.
+  - Use exceptions for exceptional conditions only, never for control flow.
+  - RAII throughout. Every owning type has a destructor that releases its resource; no `new`/`delete` pairs in application code.
+  - Mark functions `noexcept` where they are genuinely noexcept (move operations, destructors, small value-semantic getters).
+  - Provide at least the basic exception safety guarantee on public APIs; strong guarantee where practical.
+  - Third-party exceptions (Exiv2, LibRaw, ONNX Runtime, Qt) are caught at module boundaries and translated to Wildframe's own error types. No raw third-party exception types propagate across module boundaries.
+  - Each module's public header documents the exception types it may throw.
+- `.clang-format` enforces formatting rules; every commit must be clang-format-clean. CI rejects commits that are not.
+
+### NFR-8: Static Analysis (clang-tidy zero findings)
+
+- `clang-tidy` must run clean with **zero findings** across the codebase.
+- Check set is broad. At minimum enable:
+  - `bugprone-*`, `cert-*`, `clang-analyzer-*`, `cppcoreguidelines-*`, `google-*`, `hicpp-*`, `modernize-*`, `performance-*`, `portability-*`, `readability-*`, `misc-*`.
+- A small set of known-noisy checks may be excluded in `.clang-tidy` with a justification comment for each exclusion.
+- **Suppression policy:**
+  - No `NOLINT`, `NOLINTNEXTLINE`, or `NOLINTBEGIN/END` without an immediately adjacent comment explaining *why* the suppression is legitimate.
+  - For every legitimate finding, the developer must first consider at least one alternative implementation that eliminates the finding. **Suppression of a legitimate finding is a last resort, not a default.**
+  - Only confirmed false positives may be suppressed, and the suppression comment must describe why it is a false positive.
+- CI rejects any PR that introduces new clang-tidy findings or new unexplained suppressions.
 
 ---
 
-## 6. Recommended Product Framing
+## 10. Software Components
 
-Frame the project as:
+Each component is delivered as a CMake static library target. Header interfaces are the only coupling. LLDB must be able to step from any module into any other module in a debug build.
 
-**AI-assisted bird photo metadata engine with culling as the first workflow**
+### Module 1: `wildframe_ingest`
+- Directory enumeration, file discovery, RAW format validation (CR3 only in MVP).
+- Produces `ImageJob` records (file path, detected format, file size, basic EXIF snippet).
 
-This framing is better than a narrow "bird focus checker" because it supports near-term and long-term capabilities with the same architecture.
+### Module 2: `wildframe_raw`
+- LibRaw wrapper: embedded preview extraction, optional full-decode crop.
+- Does *not* own Exiv2 — all Exiv2 use (EXIF read and XMP sidecar write) is consolidated in `wildframe_metadata` so one module owns the library.
 
----
+### Module 3: `wildframe_detect`
+- ONNX Runtime wrapper for object detection.
+- Default model: **YOLOv11 (COCO-80, bird class)** exported to ONNX.
+- Pluggable alternative via config: **MegaDetector v6**.
+- Outputs: `DetectionResult` with boxes, confidences, selected primary subject.
 
-## 7. High-Level Software Components
+### Module 4: `wildframe_focus`
+- OpenCV-based classical focus and motion-blur scoring on the primary subject crop.
+- Outputs: `FocusResult` with focus score, motion blur score, subject size, keeper score.
 
-## Component A: Ingestion Layer
-Purpose:
-- Discover images to analyze
-- Read file paths and source metadata
-- Extract embedded previews or generate analysis previews
-- Collect EXIF and related deterministic metadata
+### Module 5: `wildframe_metadata`
+- Sole owner of Exiv2.
+- EXIF read (deterministic metadata) from RAW files.
+- XMP sidecar read/write using Exiv2's high-level API (forbid hand-assembled XMP).
+- `wildframe:*`, `wildframe_provenance:*`, `wildframe_user:*` namespace definitions and schema versioning.
+- Provenance field population.
 
-Possible responsibilities:
-- file enumeration
-- RAW format handling
-- EXIF extraction
-- preview extraction
-- batching / job creation
+### Module 6: `wildframe_orchestrator`
+- Owns the job queue and pipeline order.
+- Stage registration interface for Phase 2+ additions.
+- Per-batch JSON manifest writer (nlohmann/json).
+- Error isolation per image — one bad file does not abort the batch.
 
-Inputs:
-- RAW files
-- folders
-- selected image lists from host app
+### Module 7: `wildframe_gui`
+- Qt 6 Widgets application.
+- Directory picker, batch runner, progress view, thumbnail grid, detail view, filter controls, override UI.
+- Links against all upstream static libraries.
 
-Outputs:
-- normalized image job records
-- preview images for model inference
-- deterministic metadata payloads
-
-## Component B: Analysis Orchestrator
-Purpose:
-- Manage the analysis pipeline for each image or batch
-- Coordinate calls to detection, classification, focus, and metadata modules
-- Aggregate outputs into one per-image result object
-
-Possible responsibilities:
-- task scheduling
-- batch orchestration
-- retry/failure handling
-- pipeline configuration
-- model version tracking
-
-Inputs:
-- normalized image job records
-- preview images
-- deterministic metadata
-- model config
-
-Outputs:
-- consolidated inference result per image
-- batch-level manifest
-- provenance metadata
-
-## Component C: Bird Detection Module
-Purpose:
-- Determine whether birds are present
-- Localize birds in the image
-
-Possible responsibilities:
-- object detection
-- candidate box ranking
-- primary-subject selection
-- small-subject thresholding
-
-Outputs:
-- bird_present
-- bird_count
-- bird_boxes
-- detection_confidence
-- primary_subject_box
-
-## Component D: Focus / Quality Scoring Module
-Purpose:
-- Estimate whether the primary bird subject is acceptably sharp and usable
-
-Possible responsibilities:
-- crop-based sharpness analysis
-- head/eye weighting if available
-- motion blur estimation
-- keeper score generation
-
-Outputs:
-- focus_score
-- head_focus_score
-- motion_blur_score
-- obstruction_score
-- eye_visible
-- keeper_score
-
-## Component E: Species and Context Inference Module
-Purpose:
-- Infer probable species and related semantic tags
-
-Possible responsibilities:
-- species top-k classification
-- date/location-aware reranking
-- action/context tagging
-- habitat/background cue extraction
-
-Outputs:
-- primary_species_guess
-- species_top_k
-- species_confidences
-- context_tags
-- action_tags
-
-## Component F: Metadata Layer
-Purpose:
-- Convert raw inference outputs into usable metadata for users and downstream tools
-
-Possible responsibilities:
-- map outputs to standard metadata fields
-- map outputs to custom metadata fields
-- generate sidecars / manifests
-- preserve model provenance
-
-Outputs:
-- XMP sidecars or updates
-- JSON metadata manifests
-- catalog-ready metadata payloads
-
-## Component G: Host Application Integration Layer
-Purpose:
-- Connect the standalone analysis engine to photo workflow software
-
-Likely first target:
-- Lightroom Classic
-
-Possible responsibilities:
-- invoke analysis for selected photos
-- poll for job completion
-- import results
-- write flags, labels, ratings, or custom metadata
-
-Outputs:
-- user-visible metadata in host app
-- workflow actions based on model outputs
-
-## Component H: Review UI / Feedback Loop
-Purpose:
-- Let the user inspect results and correct mistakes
-- Capture corrected labels for later training/evaluation
-
-Possible responsibilities:
-- show bird crop and scores
-- approve/reject species guess
-- override focus result
-- mark best image in burst
-- export corrected training labels
-
-Outputs:
-- corrected metadata
-- labeled training/evaluation data
-- QA and model improvement signals
+### Future modules (Phase 2+, not in MVP)
+- `wildframe_species` — species classification.
+- `wildframe_feedback` — review overrides captured as training-ready labels.
+- `wildframe_lightroom` — Lightroom Classic integration layer.
 
 ---
 
-## 8. Basic Data Flow
+## 11. Repository Layout (Pitchfork)
 
-## End-to-end flow
+Wildframe follows the [Pitchfork Layout](https://github.com/vector-of-bool/pitchfork) for C++ projects. Adopting a widely-documented layout eliminates local conventions that a new maintainer would otherwise have to learn.
 
-1. User selects a folder of RAW files or selects images from a host app.
-2. Ingestion layer discovers files and extracts deterministic metadata.
-3. Ingestion layer obtains an analysis image:
-   - preferably embedded preview for fast first-pass inference
-   - optionally higher-resolution crop path for detailed focus scoring
-4. Analysis orchestrator creates per-image analysis jobs.
-5. Bird detection module determines:
-   - whether a bird is present
-   - how many birds are present
-   - where the birds are located
-6. If a bird is detected, the system selects a primary subject box.
-7. Focus module evaluates the bird crop and outputs sharpness/keeper-related scores.
-8. Species/context module evaluates the bird crop and outputs:
-   - species candidates
-   - confidence scores
-   - semantic/context tags
-9. Metadata layer merges:
-   - deterministic metadata
-   - AI metadata
-   - provenance metadata
-10. Results are persisted to sidecar/catalog/manifests.
-11. Host app integration layer imports results into the workflow environment.
-12. User reviews and corrects outputs.
-13. Corrections are captured for future model evaluation and retraining.
+```
+wildframe/
+├── CMakeLists.txt              # top-level project definition
+├── CMakePresets.json           # debug / release / tidy / asan presets
+├── vcpkg.json                  # dependency manifest (pinned versions)
+├── .clang-format               # formatting rules (enforced in CI)
+├── .clang-tidy                 # static analysis rules (zero findings required)
+├── libs/                       # internal static libraries, one per module
+│   ├── ingest/
+│   │   ├── include/wildframe/ingest/   # public headers
+│   │   ├── src/                        # implementation
+│   │   ├── tests/                      # GoogleTest target
+│   │   └── CMakeLists.txt
+│   ├── raw/
+│   ├── detect/
+│   ├── focus/
+│   ├── metadata/
+│   └── orchestrator/
+├── src/                        # the Wildframe GUI executable
+│   └── CMakeLists.txt
+├── data/                       # non-code assets (default config, schema files)
+│   └── xmp_schema/
+├── tests/                      # cross-module integration tests
+├── tools/                      # build-time scripts
+│   └── fetch_models.cmake      # downloads ONNX models with SHA256 verification
+├── docs/                       # project documentation
+│   ├── STYLE.md                # resolved conflicts between Core Guidelines and Google style; exception policy
+│   ├── ARCHITECTURE.md         # module dependency diagram and rationale
+│   ├── METADATA.md             # wildframe:* XMP field reference
+│   └── LICENSING.md            # Qt LGPL notes, model-weight fetch URLs and upstream licenses
+├── external/                   # vendored third-party code, if any
+├── cmake/                      # reusable CMake helpers and find-modules
+└── build/                      # out-of-source build directory (gitignored)
+```
 
----
+### Model assets — fetch at build time, do not commit
 
-## 9. Suggested Metadata Schema (High Level)
-
-## Deterministic metadata
-- file_path
-- file_name
-- capture_datetime
-- camera_model
-- lens_model
-- focal_length
-- aperture
-- shutter_speed
-- iso
-- gps_lat
-- gps_lon
-- burst_sequence_id (if derivable)
-- image_dimensions
-
-## AI metadata
-- bird_present
-- bird_count
-- bird_boxes
-- primary_subject_box
-- detection_confidence
-- focus_score
-- head_focus_score
-- eye_visible
-- motion_blur_score
-- obstruction_score
-- subject_size_percent
-- keeper_score
-- primary_species_guess
-- species_top_k
-- species_confidences
-- action_tags
-- context_tags
-
-## Provenance metadata
-- analysis_timestamp
-- pipeline_version
-- detector_model_name
-- detector_model_version
-- classifier_model_name
-- classifier_model_version
-- focus_model_name
-- focus_model_version
-- reranking_inputs_used
-- user_override_flags
+ONNX model weights are **not committed to the repository**. The `tools/fetch_models.cmake` script downloads them from upstream release URLs during CMake configure, verifies each file against a pinned SHA256, and caches them under `build/_models/`. This keeps the repo lean, makes the model version a reviewable part of the codebase (URL + hash both live in version control), and sidesteps redistribution licensing concerns since the weights are never republished from our tree.
 
 ---
 
-## 10. Recommended Technical Approach
+## 12. Data Flow (MVP)
 
-## Architecture recommendation
-Use a standalone analysis engine plus thin host-app integration.
-
-Why:
-- AI and computer vision logic will likely require Python and modern ML tooling.
-- Host application plugin environments are usually too limited for the core analysis logic.
-- A thin integration layer is easier to maintain.
-
-## Likely implementation shape
-- desktop or local service for analysis engine
-- plugin or script layer for Lightroom Classic
-- metadata sidecars and/or manifest files for interchange
-- optional local database for job and result tracking
-
-## Suggested implementation phases
-- Phase 1: standalone batch analyzer
-- Phase 2: metadata export and review tooling
-- Phase 3: Lightroom integration
-- Phase 4: feedback-driven retraining and search UX
-- Phase 5: advanced birding workflows such as checklist-aware reranking or burst summarization
+1. User picks a directory in the Qt GUI.
+2. `wildframe_ingest` enumerates RAW files and creates `ImageJob` records.
+3. `wildframe_orchestrator` queues jobs; the background worker drains the queue.
+4. Per image:
+   1. `wildframe_raw` extracts the embedded JPEG preview from the CR3.
+   2. `wildframe_metadata` reads deterministic EXIF from the CR3.
+   3. `wildframe_detect` runs ONNX detection on the preview, produces boxes + primary subject.
+   4. `wildframe_focus` crops to the primary subject, produces focus/keeper scores.
+   5. `wildframe_metadata` writes AI + provenance fields to the XMP sidecar.
+   6. Orchestrator appends a row to the batch JSON manifest.
+5. GUI refreshes the thumbnail grid as results arrive.
+6. User reviews, filters, overrides. Overrides are written back into the same XMP sidecar under `wildframe_user:*`.
 
 ---
 
-## 11. AI Opportunities Beyond MVP
+## 13. Metadata Schema (MVP)
 
-Once bird detection and focus scoring work, the same pipeline can be extended to:
+### Deterministic metadata (read from EXIF, mirrored into sidecar for convenience)
+- `file_path`, `file_name`, `capture_datetime`, `camera_model`, `lens_model`, `focal_length`, `aperture`, `shutter_speed`, `iso`, `gps_lat`, `gps_lon`, `image_dimensions`.
 
-- species prediction
-- burst deduplication / best-frame ranking
-- perched vs in-flight classification
-- waterbird / shorebird / raptor / songbird broad categories
-- behavior tags such as feeding, perched, flying, wading
-- date/location-aware species reranking
-- semantic search
-- eBird checklist correlation
-- habitat tagging
-- rarity flagging with explicit caution and low automation
+### AI metadata (XMP namespace `wildframe:`)
+- `bird_present` (bool)
+- `bird_count` (int)
+- `bird_boxes[]` (array of {x, y, w, h, confidence})
+- `primary_subject_box` (reference to best box)
+- `detection_confidence` (float)
+- `focus_score` (float, 0–1)
+- `motion_blur_score` (float, 0–1)
+- `subject_size_percent` (float, 0–1)
+- `keeper_score` (float, 0–1)
 
----
+### Provenance (namespace `wildframe_provenance:`)
+- `analysis_timestamp`, `pipeline_version`, `detector_model_name`, `detector_model_version`, `focus_algorithm_version`.
 
-## 12. Risks and Design Cautions
-
-## Product risks
-- "In focus" is subjective and bird-specific; generic sharpness metrics may not be useful.
-- Species classification may be overtrusted by users if confidence is not clearly surfaced.
-- Bird detection may over-trigger on statues, signs, or very small distant shapes.
-- Small birds, occlusion, motion blur, and cluttered habitats will be challenging.
-
-## Technical risks
-- RAW decoding and preview extraction can become a bottleneck.
-- Metadata writing must avoid damaging or confusing the user’s existing workflow.
-- Plugin integration may be limited by host app SDK constraints.
-- Model inference performance may be slow on large datasets without batching or hardware acceleration.
-
-## Data risks
-- Training data licensing must be handled carefully.
-- User corrections must be separated from unverified AI predictions.
-- Scientific correctness should not be overstated.
+### User override (namespace `wildframe_user:`)
+- `bird_present_override`, `keeper_override` (approved/rejected), `user_note`, `override_timestamp`.
 
 ---
 
-## 13. Open Design Questions for Planning Agent
+## 14. Phased Roadmap
 
-The planning agent should help resolve:
-
-1. What is the best first host environment:
-   - standalone only
-   - Lightroom Classic first
-   - CLI plus Lightroom plugin
-2. What metadata persistence strategy should be primary:
-   - XMP sidecars
-   - host-app-only metadata
-   - JSON manifests plus optional XMP
-3. Should v1 focus only on:
-   - bird present
-   - focus score
-   - keeper score
-   or also include species top-k
-4. Should focus scoring be:
-   - mostly classical CV + heuristics first
-   - model-based from the beginning
-5. What review UX is needed for v1:
-   - no UI, just metadata
-   - lightweight local review tool
-   - host-app-centric correction flow
-6. What operating system should be primary for the initial build:
-   - macOS
-   - Windows
-   - cross-platform desktop
-7. What hardware targets should be supported:
-   - CPU only
-   - Apple Silicon
-   - NVIDIA CUDA
-   - mixed acceleration paths
+- **Phase 1 (MVP)** — modules 1–7 as defined in Section 10, CR3 only.
+- **Phase 2** — additional RAW formats (CR2/NEF/ARW/RAF/ORF/RW2/DNG), species top-k classification, eye/head detection, feedback capture, training sidecar (Python, external to delivery).
+- **Phase 3** — Lightroom Classic integration layer; raw-ingest subprocess integration in GUI.
+- **Phase 4** — burst dedup / best-of-burst, action/context tags, checklist-aware reranking.
+- **Phase 5** — semantic search UX, eBird correlation, rarity flagging.
 
 ---
 
-## 14. Recommended MVP Definition
+## 15. Risks and Design Cautions
 
-A practical MVP could be defined as:
+### Product
+- Focus is subjective. Keeper-score weights will need user-facing tuning; design the formula as documented, adjustable configuration from day one.
+- Detection false-positives on statues/signs/distant non-birds. Mitigation: MegaDetector is pluggable as an alternative detector.
+- Small birds, occlusion, motion blur, cluttered habitats — no model handles these perfectly.
 
-### Inputs
-- folder of RAW bird photos
+### Technical
+- Preview-path inference may lose detail on very small subjects. The full-decode fallback for focus scoring is expensive; keep it gated by subject size.
+- XMP sidecar writes can corrupt existing sidecars if not careful. Exiv2 handles this correctly via its high-level API; forbid hand-assembled XMP.
+- ONNX Runtime version drift across vcpkg updates. Pin the exact version in the manifest.
+- **Qt 6 licensing**: MVP uses Qt via LGPL with dynamic linking. Static-linking Qt requires a commercial license. Document this in `docs/LICENSING.md` and keep Qt as the only dynamically-linked dependency in the delivered binary.
+- **clang-tidy policy** may slow early development as the team tunes the check set. Budget time in Sprint 0 for finalizing `.clang-tidy` against a representative sample of module code.
 
-### Outputs per image
-- bird_present
-- bird_boxes
-- focus_score
-- keeper_score
-- optional species_top_3
-
-### Persistence
-- JSON manifest plus optional XMP sidecar
-
-### User interaction
-- analyze batch
-- review results
-- filter to likely keepers and likely no-bird frames
-
-### Success criteria
-- reduces manual culling time
-- catches most obvious no-bird frames
-- surfaces a large fraction of sharp bird keepers
-- produces metadata useful enough to support filtering/search
+### Data
+- Model licensing: confirm YOLOv11 and MegaDetector redistribution terms. Because weights are fetched at build time from upstream, the customer redistributes only URLs and hashes, not weights, which simplifies the licensing posture.
 
 ---
 
-## 15. Recommendation to Planning Agent
+## 16. Resolved Design Decisions (from scoping conversation)
 
-Treat this as a metadata-enrichment platform with a bird-photo culling MVP.
-
-Prioritize:
-1. architecture and metadata schema
-2. standalone analyzer
-3. review/correction loop
-4. Lightroom integration
-5. advanced species/context enrichment
-
-Avoid over-scoping around editing, DAM replacement, or highly granular ornithological claims in v1.
+1. Product name: **Wildframe**.
+2. Delivery: **C++ source code**, targeting an average-skilled embedded C++ developer as the maintainer.
+3. Primary platform: **macOS Intel** for development, **macOS Apple Silicon** as the release performance target.
+4. Build: **CMake + vcpkg** (manifest mode).
+5. Repository layout: **Pitchfork**.
+6. GUI: **Qt 6 Widgets** (LGPL, dynamic linking).
+7. ML inference: **ONNX Runtime with CoreML Execution Provider**, CPU EP fallback.
+8. **No Python** in the MVP delivery. Models are pre-trained and shipped via build-time fetch of `.onnx` files.
+9. Model distribution: **not committed** — fetched at build time with pinned SHA256 from upstream URLs.
+10. RAW format support in MVP: **Canon CR3 only**.
+11. Metadata persistence: **XMP sidecars as source of truth**, per-batch JSON manifest as run log. **No SQLite** in MVP.
+12. Testing: **GoogleTest**.
+13. Debugger: **LLDB**.
+14. Module structure: **one static library per module**, debuggable across boundaries.
+15. raw-ingest: **loosely coupled**. Wildframe's input contract is "a directory containing RAW files."
+16. **Maintainability is the primary non-functional concern** for every decision.
+17. **Strict C++ Core Guidelines + Google C++ Style Guide** compliance; conflicts resolved in `docs/STYLE.md`.
+18. **clang-tidy zero findings** required; suppressions only for confirmed false positives, each with a justification comment.
+19. **C++20** locked (no C++17 fallback).
+20. **Exceptions allowed** per Core Guidelines, with policy formalized in `docs/STYLE.md`; third-party exceptions translated at module boundaries.
+21. Logging: **spdlog** (Boost.Log considered and rejected to avoid pulling in Boost solely for logging).
 
 ---
 
-## 16. Compact LLM-Parseable Summary
+## 17. Handoff to Planning Agent
 
-## Project
-AI-assisted bird photo metadata engine
+This document is ready to be decomposed into development tasks. The planning agent should:
 
-## MVP objective
-Analyze RAW bird photos and attach metadata that helps with culling.
-
-## MVP core outputs
-- bird_present
-- bird_boxes
-- focus_score
-- keeper_score
-- optional species_top_k
-
-## Primary architecture
-- standalone analysis engine
-- metadata output layer
-- optional Lightroom Classic integration layer
-
-## Core modules
-- ingestion
-- analysis orchestrator
-- bird detector
-- focus scorer
-- species/context inference
-- metadata writer
-- host app integration
-- review/feedback UI
-
-## Key design principle
-Treat AI as a metadata enrichment pipeline, not just a keep/reject classifier.
-
-## Main user value
-Faster culling, better search, richer wildlife-photo organization.
-
-## Main planning priorities
-- define metadata schema
-- choose persistence strategy
-- define MVP boundaries
-- decide host integration strategy
-- design correction feedback loop
+1. Produce a per-module task breakdown aligned with the seven MVP modules in Section 10.
+2. Define module-level acceptance criteria tied to the FRs in Section 8 and NFRs in Section 9.
+3. Identify the critical path: `wildframe_ingest` → `wildframe_raw` → `wildframe_detect` → `wildframe_focus` → `wildframe_metadata` → `wildframe_orchestrator` → `wildframe_gui`.
+4. Schedule **Sprint 0** tasks before any module work:
+   - Pitchfork directory scaffold (Section 11).
+   - `vcpkg.json` manifest with pinned versions of LibRaw, Exiv2, OpenCV, ONNX Runtime, Qt 6, nlohmann/json, spdlog, GoogleTest.
+   - Top-level `CMakeLists.txt` with one empty static-lib target per module, plus the GUI executable target.
+   - `CMakePresets.json` for debug, release, tidy (clang-tidy run), and asan.
+   - `.clang-format` baseline derived from Google style.
+   - `.clang-tidy` baseline with the check set in NFR-8; tune against a sample module.
+   - `docs/STYLE.md` resolving Core Guidelines vs Google Style Guide conflicts.
+   - `tools/fetch_models.cmake` with YOLOv11 URL + SHA256 placeholder entries.
+   - Test fixture policy: decide between committing a small set of representative CR3 files (LFS, a few MB each) and fetching them at test-setup time the same way models are fetched. Fixtures must cover: clear bird in frame, no bird, small distant bird, motion-blurred bird, and a non-bird false-positive magnet (statue or sign).
+   - CI (GitHub Actions, macOS runner) running: build, test, clang-format check, clang-tidy gate.
+5. Treat YOLOv11 ONNX export URL + SHA256 + licensing confirmation as a prerequisite for `wildframe_detect`.
+6. Schedule a benchmark task at the end of MVP to validate the Section 9 performance targets on both Intel and Apple Silicon.
+7. Every task's Definition of Done must include: clang-format clean, clang-tidy zero-findings, GoogleTest coverage for public interfaces, and conformance to `docs/STYLE.md`.
