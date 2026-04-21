@@ -7,5 +7,3 @@ target_include_directories(wildframe_focus
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
-
-target_compile_features(wildframe_focus PUBLIC cxx_std_20)

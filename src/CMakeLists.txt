@@ -11,5 +11,3 @@ target_link_libraries(wildframe
         wildframe::metadata
         wildframe::orchestrator
 )
-
-target_compile_features(wildframe PRIVATE cxx_std_20)

@@ -7,5 +7,3 @@ target_include_directories(wildframe_orchestrator
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
-
-target_compile_features(wildframe_orchestrator PUBLIC cxx_std_20)
