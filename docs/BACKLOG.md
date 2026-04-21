@@ -59,7 +59,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-7
   - Resolve Core Guidelines vs Google Style conflicts for: exception policy (per handoff §NFR-7), header ordering, smart-pointer conventions, naming (CamelCase vs snake_case for types/functions/variables), use of `auto`, RAII patterns, `noexcept` policy. Every resolution cites why.
 
-- [ ] **S0-08** — `docs/LICENSING.md`
+- [x] **S0-08** — `docs/LICENSING.md`
   - Deps: S0-01
   - Size: S
   - Satisfies: §15 (risks)
