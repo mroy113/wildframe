@@ -65,7 +65,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §15 (risks)
   - Document Qt 6 LGPL + dynamic-linking obligation, Wildframe's license choice (needs customer decision), upstream licenses for LibRaw, Exiv2, OpenCV, ONNX Runtime, spdlog, nlohmann/json, GoogleTest. Document model-weight URLs + upstream licenses for YOLOv11 and MegaDetector.
 
-- [ ] **S0-09** — `docs/ARCHITECTURE.md`
+- [x] **S0-09** — `docs/ARCHITECTURE.md`
   - Deps: S0-01
   - Size: M
   - Satisfies: §10, NFR-3
