@@ -17,7 +17,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 
 ## Sprint 0 — Scaffolding (blocks everything else)
 
-- [ ] **S0-01** — Pitchfork directory scaffold
+- [x] **S0-01** — Pitchfork directory scaffold
   - Deps: none
   - Size: S
   - Satisfies: §11 (layout)
