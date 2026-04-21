@@ -47,7 +47,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-7
   - Derive from Google style. Document deviations in `docs/STYLE.md`. Add `format` and `format-check` CMake targets.
 
-- [ ] **S0-06** — `.clang-tidy` baseline and tuning
+- [x] **S0-06** — `.clang-tidy` baseline and tuning
   - Deps: S0-05
   - Size: M
   - Satisfies: NFR-8

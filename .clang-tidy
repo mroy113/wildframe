@@ -1,0 +1,154 @@
+---
+# Wildframe clang-tidy baseline (S0-06, gates NFR-8).
+#
+# The enabled category set matches the minimum list in handoff §NFR-8:
+#   bugprone-*, cert-*, clang-analyzer-*, cppcoreguidelines-*,
+#   google-*, hicpp-*, modernize-*, performance-*, portability-*,
+#   readability-*, misc-*.
+#
+# The leading `-*` makes the enabled set explicit. Disables below fall
+# into two buckets: (a) duplicate aliases of an already-enabled check
+# (hicpp-* and some cert-* re-export bugprone/cppcoreguidelines/
+# modernize checks verbatim — without the dupe-disable the gate fires
+# twice on the same line), and (b) checks that are unequivocally
+# preference-based against the style this codebase commits to via
+# docs/STYLE.md (Google base + C++ Core Guidelines exception policy).
+#
+# ----- DISABLED-CHECK JUSTIFICATIONS -----
+# YAML block scalars don't allow inline `#` comments inside the Checks
+# string (they get parsed as glob tokens), so justifications live here,
+# keyed by check name. Update both together.
+#
+# --- (a) duplicate aliases ---
+# hicpp-avoid-c-arrays                 dupe of cppcoreguidelines-avoid-c-arrays
+# hicpp-braces-around-statements       dupe of readability-braces-around-statements
+# hicpp-deprecated-headers             dupe of modernize-deprecated-headers
+# hicpp-explicit-conversions           dupe of google-explicit-constructor
+# hicpp-function-size                  dupe of readability-function-size
+# hicpp-invalid-access-moved           dupe of bugprone-use-after-move
+# hicpp-member-init                    dupe of cppcoreguidelines-pro-type-member-init
+# hicpp-named-parameter                dupe of readability-named-parameter
+# hicpp-no-array-decay                 dupe of cppcoreguidelines-pro-bounds-array-to-pointer-decay
+# hicpp-no-malloc                      dupe of cppcoreguidelines-no-malloc
+# hicpp-noexcept-move                  dupe of performance-noexcept-move-constructor
+# hicpp-special-member-functions       dupe of cppcoreguidelines-special-member-functions
+# hicpp-uppercase-literal-suffix       dupe of readability-uppercase-literal-suffix
+# hicpp-use-auto                       dupe of modernize-use-auto
+# hicpp-use-equals-default             dupe of modernize-use-equals-default
+# hicpp-use-equals-delete              dupe of modernize-use-equals-delete
+# hicpp-use-noexcept                   dupe of modernize-use-noexcept
+# hicpp-use-nullptr                    dupe of modernize-use-nullptr
+# hicpp-use-override                   dupe of modernize-use-override
+# hicpp-vararg                         dupe of cppcoreguidelines-pro-type-vararg
+# hicpp-avoid-goto                     dupe of cppcoreguidelines-avoid-goto
+# hicpp-signed-bitwise                 dupe of bugprone-narrowing-conversions coverage
+# google-readability-function-size     dupe of readability-function-size
+# cert-dcl21-cpp                       deprecated alias (see clang-tidy 17+ release notes)
+# cert-str34-c                         dupe of bugprone-signed-char-misuse
+# cppcoreguidelines-c-copy-assignment-signature   dupe of misc-unconventional-assign-operator
+#
+# --- (b) preference-based disables ---
+# modernize-use-trailing-return-type
+#     Google style does not use trailing return types; enabling forces
+#     `auto f() -> int` project-wide with no readability gain.
+# modernize-use-nodiscard
+#     Would require [[nodiscard]] on effectively every getter; volume
+#     of noise swamps the real cases. Re-enable if we ship a bug that
+#     would have been caught.
+# readability-identifier-length
+#     Flags `i`, `x`, `n`, `v`. Counter-pattern (`index`, `x_coord`,
+#     `count`) is noisier than the alleged gain and clashes with
+#     math-paper variable naming used in focus/detect math.
+# cppcoreguidelines-avoid-magic-numbers / readability-magic-numbers
+#     Both fire on every legitimate threshold constant (e.g. detection
+#     confidence 0.25, YOLO input 640). Named constants used where they
+#     aid clarity; forcing them everywhere is pure noise.
+# cppcoreguidelines-pro-bounds-pointer-arithmetic
+#     Fires on `argv[1]`, `buf.begin() + n`, string-view iteration.
+#     gsl::span wrappers would be heavier than the risk in this codebase.
+# cppcoreguidelines-pro-type-vararg
+#     Fires on printf-style APIs we cannot avoid at third-party
+#     boundaries (LibRaw / Exiv2 C interfaces, occasional std::fprintf).
+# cppcoreguidelines-owning-memory
+#     Requires gsl::owner<T*> annotations; we do not depend on GSL and
+#     our C-resource boundaries are already wrapped in RAII types.
+# cppcoreguidelines-narrowing-conversions
+#     Dupe of bugprone-narrowing-conversions with a broader set of
+#     false positives on size_t/int loop counters.
+# cppcoreguidelines-avoid-non-const-global-variables
+#     Warns on every static/global including test singletons and
+#     spdlog's default logger; handoff §NFR-7 already constrains global
+#     state, and test fixtures need globals.
+# cppcoreguidelines-avoid-do-while
+#     Do-while is idiomatic for "run at least once" loops in our style;
+#     the warning offers no concrete alternative.
+# bugprone-easily-swappable-parameters
+#     Flags adjacent same-typed params (e.g. `int w, int h`); rewriting
+#     every such signature into a named struct is noisier than the risk.
+# portability-avoid-pragma-once
+#     `#pragma once` is supported by every compiler Wildframe targets
+#     (Apple Clang 15+, Clang, GCC; no MSVC in MVP scope — see handoff
+#     §3) and is already the convention in every public header in the
+#     tree. Enforcing include guards would be pure stylistic churn.
+
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  google-*,
+  hicpp-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  misc-*,
+  -hicpp-avoid-c-arrays,
+  -hicpp-braces-around-statements,
+  -hicpp-deprecated-headers,
+  -hicpp-explicit-conversions,
+  -hicpp-function-size,
+  -hicpp-invalid-access-moved,
+  -hicpp-member-init,
+  -hicpp-named-parameter,
+  -hicpp-no-array-decay,
+  -hicpp-no-malloc,
+  -hicpp-noexcept-move,
+  -hicpp-special-member-functions,
+  -hicpp-uppercase-literal-suffix,
+  -hicpp-use-auto,
+  -hicpp-use-equals-default,
+  -hicpp-use-equals-delete,
+  -hicpp-use-noexcept,
+  -hicpp-use-nullptr,
+  -hicpp-use-override,
+  -hicpp-vararg,
+  -hicpp-avoid-goto,
+  -hicpp-signed-bitwise,
+  -google-readability-function-size,
+  -cert-dcl21-cpp,
+  -cert-str34-c,
+  -cppcoreguidelines-c-copy-assignment-signature,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -readability-identifier-length,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-narrowing-conversions,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-avoid-do-while,
+  -bugprone-easily-swappable-parameters,
+  -portability-avoid-pragma-once
+
+WarningsAsErrors: '*'
+
+# Only analyze our own code. Third-party headers (vcpkg, Qt, Exiv2,
+# LibRaw, ONNX Runtime) are out of scope for clang-tidy and would both
+# slow the gate and emit findings we cannot fix.
+HeaderFilterRegex: '.*/(libs|src|tests)/.*'
+
+FormatStyle: file
