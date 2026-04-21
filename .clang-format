@@ -1,0 +1,9 @@
+# Wildframe clang-format baseline (S0-05).
+#
+# Derived from Google C++ style with no deviations. Rationale and any
+# future deviations are documented in docs/STYLE.md — add a deviation
+# here only after updating that file with its justification.
+---
+Language: Cpp
+BasedOnStyle: Google
+Standard: c++20

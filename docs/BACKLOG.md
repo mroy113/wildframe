@@ -41,7 +41,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §3 (delivery), NFR-8
   - `debug`: `-DCMAKE_BUILD_TYPE=Debug -g`. `release`: `-DCMAKE_BUILD_TYPE=Release -O3`. `tidy`: runs clang-tidy over the compile-commands database. `asan`: debug + AddressSanitizer.
 
-- [ ] **S0-05** — `.clang-format` baseline
+- [x] **S0-05** — `.clang-format` baseline
   - Deps: S0-03
   - Size: S
   - Satisfies: NFR-7

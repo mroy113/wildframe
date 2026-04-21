@@ -8,6 +8,4 @@
 /// manifest, and isolates per-image errors. Concrete APIs land with tasks
 /// M6-01..M6-08.
 
-namespace wildframe::orchestrator {
-
-}  // namespace wildframe::orchestrator
+namespace wildframe::orchestrator {}  // namespace wildframe::orchestrator

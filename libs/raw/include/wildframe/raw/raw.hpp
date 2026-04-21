@@ -7,6 +7,4 @@
 /// optional full-decode crop. Does not own Exiv2; EXIF read lives in
 /// `wildframe_metadata`. Concrete APIs land with tasks M2-01..M2-04.
 
-namespace wildframe::raw {
-
-}  // namespace wildframe::raw
+namespace wildframe::raw {}  // namespace wildframe::raw
