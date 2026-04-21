@@ -71,7 +71,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §10, NFR-3
   - Module dependency graph (Mermaid or ASCII). Per-module one-paragraph purpose. Data-flow walkthrough (from §12 of the handoff). Stage-registration extension point for Phase 2+.
 
-- [ ] **S0-10** — `docs/METADATA.md`
+- [x] **S0-10** — `docs/METADATA.md`
   - Deps: S0-01
   - Size: S
   - Satisfies: FR-5, FR-8, NFR-4
