@@ -30,6 +30,9 @@ include(ClangTooling)
 # Configure-time fetch of pinned ONNX model weights (S0-11).
 include("${CMAKE_SOURCE_DIR}/tools/fetch_models.cmake")
 
+# Configure-time fetch of pinned CR3 test fixtures (S0-12).
+include("${CMAKE_SOURCE_DIR}/tools/fetch_fixtures.cmake")
+
 # Internal static-library modules (see handoff doc §10).
 add_subdirectory(libs/ingest)
 add_subdirectory(libs/raw)

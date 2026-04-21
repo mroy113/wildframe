@@ -5,6 +5,10 @@ build/
 # Redundant with build/ above, but listed explicitly per the S0-01 spec.
 build/_models/
 
+# Test fixtures fetched at configure time (see tools/fetch_fixtures.cmake).
+# Redundant with build/ above; listed for parity with _models/.
+build/_fixtures/
+
 # macOS
 .DS_Store
 
