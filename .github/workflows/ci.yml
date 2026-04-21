@@ -55,8 +55,11 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Install Ninja and LLVM (clang-format, clang-tidy)
-        run: brew install ninja llvm
+      - name: Install Ninja, LLVM (clang-format, clang-tidy), and vcpkg build prerequisites
+        # autoconf / autoconf-archive / automake / libtool are required by
+        # autotools-based vcpkg ports (e.g. libb2, transitive via exiv2);
+        # the runner's Xcode toolchain does not ship them.
+        run: brew install ninja llvm autoconf autoconf-archive automake libtool
 
       - name: Bootstrap vcpkg at vcpkg.json builtin-baseline
         run: |
