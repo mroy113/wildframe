@@ -126,7 +126,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
     - How to build (pointer to `docs/DEV_SETUP.md`).
   - Separate from `CLAUDE.md` (agent-facing) and `CONTRIBUTING.md` (contributor-facing). Initial sections can be stubs, filled in as modules land.
 
-- [ ] **S0-17** — Logging policy
+- [x] **S0-17** — Logging policy
   - Deps: S0-01
   - Size: S
   - Satisfies: NFR-5

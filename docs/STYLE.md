@@ -318,5 +318,161 @@ something not listed is a bug.
 
 ## 4. Logging
 
-**TODO (S0-17):** Level semantics, default level per build type, module
-tag conventions, and file rotation policy.
+All application logging goes through **spdlog** (handoff §5, §NFR-5).
+S0-14 initializes one process-global pair of sinks — stdout and a
+daily-rotating file — both thread-safe. Agents add log lines by
+picking a level from §4.1 and using the module-tagged macro in §4.5.
+
+### 4.1 Level semantics
+
+Wildframe uses all six spdlog levels. Pick the level that describes
+how much a reader would want the line later during an incident
+investigation or code review.
+
+| Level | Intent | Example |
+|---|---|---|
+| `trace` | Inner-loop diagnostics. Compiled out of release binaries via `SPDLOG_ACTIVE_LEVEL` (§4.2). Use when you would `printf` a tensor shape while debugging but would not want the line surviving a batch of 500 images. | Per-stage byte counts during preview decode; pre-NMS box counts in `wildframe_detect`. |
+| `debug` | Per-image or per-stage facts useful to an engineer reconstructing what happened, too noisy for users. Default on in `debug` build, off in `release`. | "detect stage produced 3 boxes, primary confidence 0.81"; "read_exif: 23 tags, focal_length=400mm". |
+| `info` | Once-per-batch or once-per-run milestones an operator expects to see in the log. Default on in both builds. | "batch started: 147 CR3 files, reanalysis_policy=skip"; "pipeline_version=0.1.0 detector=yolov11 v11.0.0 ep=coreml". |
+| `warn` | Something is off but the pipeline continued. A reader should be able to scan `warn` lines to find every skipped file without reading lower levels. | "skipped malformed CR3: /path/IMG_0001.CR3 — magic bytes mismatch"; "coreml EP unavailable, falling back to CPU". |
+| `error` | A single job failed and the orchestrator wrote a failure row to the batch manifest (M6-04). Exactly **one** `error` line per failed job, including the job path. | "job failed: /path/IMG_0042.CR3 — RawDecodeError: LibRaw rc=-2 (Unsupported file format)". |
+| `critical` | The batch is aborting or the process is going down. Reserved for M6-04's catastrophic conditions (OOM, corrupt ONNX model, missing startup asset). At most a handful per run. | "ONNX model load failed: weights/yolov11.onnx — session init threw"; "aborting batch". |
+
+**Do not use `error` for expected per-image skips** (malformed CR3,
+unreadable path). Those are `warn` — they are the expected outcome of
+§3.4 "exceptions are for exceptional conditions only" translated to
+the logging layer. `error` means an orchestrator manifest row was
+written; `warn` means the image was dropped earlier without producing
+a row.
+
+### 4.2 Default thresholds
+
+| Build | stdout sink | file sink |
+|---|---|---|
+| `debug` preset | `debug` | `debug` |
+| `release` preset | `info` | `info` |
+| `asan` preset | `debug` | `debug` |
+| Tests under `ctest` | `warn` | disabled (tests do not rotate the user's log file) |
+
+Both sinks share a level in a given build so a reader never has to
+correlate across sinks to reconstruct what happened. Overridable per
+run via the TOML config key `log_level` (S0-18) for field debugging.
+
+`trace` requires a rebuild: `SPDLOG_ACTIVE_LEVEL` is set at compile
+time to `SPDLOG_LEVEL_DEBUG` for `release` and `SPDLOG_LEVEL_TRACE`
+for `debug`/`asan`, so `trace` lines are eliminated from release
+binaries entirely. This is spdlog's recommended way to keep zero-cost
+diagnostics in hot paths.
+
+### 4.3 Log destination and rotation
+
+Defaults locked by handoff §25 and S0-19:
+
+- **Path:** `~/Library/Logs/Wildframe/wildframe.log`.
+- **Rotation:** daily, at local midnight.
+- **Retention:** 14 rotated files — older rotations are deleted on
+  the next rotation.
+- **Override:** TOML config key `log_path` (S0-18, S0-19).
+
+Implementation note for S0-14: use
+`spdlog::sinks::daily_file_sink_mt` with `max_files=14`. Do not write
+to stderr — Wildframe is GUI-first and stderr is not user-visible.
+The rotating file sink is the audit trail per NFR-5; the stdout sink
+exists for developers running from a terminal, not for end users.
+
+### 4.4 Log line format
+
+```
+<YYYY-MM-DD HH:MM:SS.mmm> [<level>] [<module>] <message>
+```
+
+Concrete `spdlog::pattern`:
+
+```
+%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%n] %v
+```
+
+- `%n` is the spdlog logger name, which carries the module tag (§4.5).
+- `%^%l%$` colorizes the level on the stdout sink; spdlog strips the
+  color markers on non-tty sinks, so the file sink uses the same
+  pattern verbatim.
+- Timestamps are local time to match the user's mental model of when
+  they ran a batch. The batch manifest (M6-05) records its own
+  ISO-8601 timestamps for machine consumption.
+
+Thread id (`%t`) is intentionally omitted: the MVP threading model
+(ARCHITECTURE.md §5) has one worker plus the Qt main thread, so the
+module tag is already unambiguous. Add `%t` only if a Phase 2
+multi-consumer queue lands.
+
+### 4.5 Module tag conventions
+
+Every log line identifies the emitting module. The tag is the module
+name from handoff §10 without the `wildframe_` prefix:
+
+| Module | Tag |
+|---|---|
+| `wildframe_ingest` | `ingest` |
+| `wildframe_raw` | `raw` |
+| `wildframe_detect` | `detect` |
+| `wildframe_focus` | `focus` |
+| `wildframe_metadata` | `metadata` |
+| `wildframe_orchestrator` | `orchestrator` |
+| `wildframe` GUI | `gui` |
+
+Build-system helpers (`tools/fetch_models.cmake`,
+`tools/fetch_fixtures.cmake`) run at CMake configure time and are out
+of scope — they use `message(STATUS …)` / `message(FATAL_ERROR …)`,
+not spdlog.
+
+**How a module picks up its tag.** S0-14 will provide one
+pre-registered logger per module, looked up by tag. Translation units
+select their tag by `#define`-ing `WILDFRAME_LOG_MODULE` before
+including the wildframe log header:
+
+```cpp
+// libs/detect/src/detect.cpp
+#define WILDFRAME_LOG_MODULE "detect"
+#include "wildframe/log/log.hpp"
+
+WILDFRAME_LOG_INFO("detect ready: ep={}", ep_name);
+```
+
+The macros (`WILDFRAME_LOG_TRACE` / `_DEBUG` / `_INFO` / `_WARN` /
+`_ERROR` / `_CRITICAL`) resolve to a cached `spdlog::get(...)` call
+against the module tag. Agents use these macros — not `spdlog::`
+APIs directly — so the tag is exactly one string per TU and swapping
+the backing sink(s) later does not touch callers.
+
+Do **not** embed the tag into the message string itself
+(`"[detect] …"`). The pattern already carries it in `[%n]`;
+duplicating doubles it up in every rotated file.
+
+### 4.6 What not to log
+
+- **Pixel buffers, raw bytes, large JSON blobs.** Log sizes and
+  hashes instead. A 24-megapixel preview base64-dumped once per image
+  would flood a rotated file within a single batch.
+- **XMP sidecar content.** The sidecar is the audit record (handoff
+  §13) — logging it is redundant and inflates log size.
+- **Paths inside tight loops.** Logging the job path once per stage
+  at `debug` is fine; per-pixel-row logging is not.
+- **Third-party stack traces at `info` or above.** Catch at the
+  module boundary (§3.1), translate to a Wildframe error type, and
+  log the translated error with the job path at `warn` / `error`.
+  Stack traces belong at `trace` and only when actively debugging.
+
+### 4.7 Interaction with the exception policy
+
+§3.4 forbids exceptions for control flow; §4 forbids using log levels
+as control flow either. Two concrete rules:
+
+- **Inner log + translated error is enough.** When a module's
+  implementation is about to throw, log the condition once at the
+  right level (`warn` if per-image-expected; `error` or `critical`
+  if pipeline-level), then throw. The boundary translator catches
+  the third-party exception and rethrows the Wildframe error type
+  (§3.1) — it does **not** log again.
+- **The orchestrator logs exactly once per job failure at `error`**
+  when it writes the manifest row (M6-04). Modules below it do not
+  also emit `error` for the same failure.
