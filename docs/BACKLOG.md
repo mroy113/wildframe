@@ -35,7 +35,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §10, §11, NFR-6
   - One `add_library(wildframe_<module> STATIC)` per MVP module, each with an empty `.cpp` and a public header. One `add_executable(wildframe)` for the GUI. Wire vcpkg toolchain. Must build clean with no sources.
 
-- [ ] **S0-04** — `CMakePresets.json` with debug / release / tidy / asan
+- [x] **S0-04** — `CMakePresets.json` with debug / release / tidy / asan
   - Deps: S0-03
   - Size: S
   - Satisfies: §3 (delivery), NFR-8
