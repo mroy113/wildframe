@@ -27,6 +27,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(ClangTooling)
 
+# Configure-time fetch of pinned ONNX model weights (S0-11).
+include("${CMAKE_SOURCE_DIR}/tools/fetch_models.cmake")
+
 # Internal static-library modules (see handoff doc §10).
 add_subdirectory(libs/ingest)
 add_subdirectory(libs/raw)

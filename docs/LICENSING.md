@@ -104,34 +104,55 @@ a commercial Qt license from The Qt Company.
 
 ---
 
-## 3. Model weights — fetched at build time, not redistributed
+## 3. Model weights — fetched at build time, not committed
 
-Model weights are **never committed to this repository** and are **never
-redistributed by Wildframe**. `tools/fetch_models.cmake` (S0-11) downloads
-them from upstream URLs during CMake configure, verifies SHA256, and
-caches them under `build/_models/`. This keeps the licensing posture for
-the repository itself trivial (we host only URLs and hashes) and pushes
-the weight-licensing obligation onto end users, who obtain weights
-directly from upstream when they build.
+Model weights are **never committed to this repository**.
+`tools/fetch_models.cmake` (S0-11) downloads them from pinned URLs during
+CMake configure, verifies SHA256, and caches them under `build/_models/`.
+
+Some pinned URLs point upstream directly; others point to a GitHub Release
+attached to this repository that hosts a Wildframe-produced export (for
+example, an ONNX file we produced from an upstream `.pt` via the upstream
+exporter). In either case the model file itself never enters git history.
+Hosting a Wildframe-produced export on our own GitHub Releases is a form
+of redistribution, so the upstream license's obligations attach to
+Wildframe's distribution whenever we self-host an export of an
+otherwise-copyleft weight.
 
 ### YOLOv11 (default detector — FR-3)
 
 - **Upstream:** Ultralytics (https://github.com/ultralytics/ultralytics).
-- **License (code + published weights):** AGPL-3.0-only, with a separate
-  commercial license offered by Ultralytics.
-- **Redistribution terms:** redistribution of the weights themselves is
-  permitted under AGPL-3.0. Because Wildframe does not redistribute the
-  weights — it instructs the build to download them from the upstream
-  release URL — the repository itself incurs no redistribution obligation.
-- **Downstream obligation at end-user runtime:** when a user builds
-  Wildframe and runs inference, the combined work (Wildframe binary +
-  downloaded AGPL weights on disk) may create AGPL obligations if the
-  user then redistributes that combined work, including network
-  redistribution. This is a consideration for users, not for Wildframe's
-  own distribution.
-- **Pinned URL + SHA256:** to be locked in during S0-11. Update this
-  section when S0-11 lands with the exact export URL and hash used by
-  `tools/fetch_models.cmake`.
+- **Upstream license (code + published weights):** AGPL-3.0-only, with a
+  separate commercial license offered by Ultralytics.
+- **Delivery:** Ultralytics does not publish a canonical ONNX asset;
+  upstream ships `.pt` weights only. Wildframe exports to ONNX via the
+  upstream exporter and hosts the result as a release asset on this
+  repository. Export command:
+  ```
+  YOLO('yolo11n.pt').export(
+      format='onnx', imgsz=640, opset=17,
+      simplify=True, dynamic=False, nms=False)
+  ```
+  Exporter toolchain: ultralytics 8.4.41, torch 2.2.2, onnx 1.21.0,
+  onnxslim 0.1.91. NMS is deliberately *not* baked into the ONNX — the
+  detect module applies confidence thresholding and NMS in C++ (M3-03).
+- **Redistribution posture:** Wildframe redistributes the exported ONNX
+  under AGPL-3.0 via its GitHub Release. Wildframe's own license is
+  GPL-3.0-or-later (§1), which is compatible with AGPL-3.0, so the
+  combined source-plus-asset distribution is consistent.
+- **Downstream obligation at runtime:** the combined work (Wildframe
+  binary + AGPL weights on disk) may create AGPL obligations if a
+  downstream user then redistributes that combined work, including
+  network redistribution. This is a consideration for redistributors
+  of built binaries, not for users running Wildframe locally.
+- **Pinned URL:** `https://github.com/mroy113/wildframe/releases/download/models-v1/yolo11n.onnx`
+- **Pinned SHA256:** `119040d6483aee48c168b427bf5d383d6cadde5745c6991e6dc24eeabf07a05a`
+- **Size:** 10,741,340 bytes.
+- **Re-export procedure:** re-run the export command above against a
+  newer Ultralytics release, attach the new `yolo11n.onnx` to a new
+  release tag (`models-v2`, `models-v3`, …; release tags are immutable),
+  and update both the URL and the SHA256 in `tools/fetch_models.cmake`
+  and in this section in the same PR.
 
 If the customer wants a detector with lighter downstream obligations, the
 MegaDetector alternative path (M3-06) exists precisely for that purpose.

@@ -77,7 +77,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: FR-5, FR-8, NFR-4
   - Document every field in the three namespaces (`wildframe:`, `wildframe_provenance:`, `wildframe_user:`). For each: name, type, range, whether AI- or user-written, and a one-line purpose. This file is the contract external tools (Lightroom smart collections) rely on.
 
-- [ ] **S0-11** — `tools/fetch_models.cmake`
+- [x] **S0-11** — `tools/fetch_models.cmake`
   - Deps: S0-03
   - Size: M
   - Satisfies: §11 (model assets), §15 (licensing)
