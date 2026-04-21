@@ -23,7 +23,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §11 (layout)
   - Create empty directory tree matching the handoff doc §11. Add placeholder `CMakeLists.txt` files where shown. Commit `.gitignore` (build/, .DS_Store, IDE files, `build/_models/`).
 
-- [ ] **S0-02** — `vcpkg.json` manifest with pinned versions
+- [x] **S0-02** — `vcpkg.json` manifest with pinned versions
   - Deps: S0-01
   - Size: S
   - Satisfies: §5 (tech stack), NFR-6
