@@ -11,7 +11,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 **Rules:**
 - Do tasks in ID order within a phase unless dependencies dictate otherwise.
 - Do not begin a task until its dependencies are merged to `main`.
-- Mark a task complete (`[x]`) only after its PR is merged.
+- Flip a task's checkbox to `[x]` inside its implementation PR. If the PR doesn't merge, the checkbox flip doesn't either — no separate bookkeeping PR.
 
 ---
 

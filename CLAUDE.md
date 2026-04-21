@@ -111,8 +111,7 @@ When starting a task:
 4. **Judgment gate.** Before writing code, ask: does the plan's prescribed approach still look like the best way to satisfy the cited FR/NFR? If you see a materially better approach, stop and propose the plan change per §5. If the prescribed approach is fine, proceed.
 5. Create a branch per `CONTRIBUTING.md`.
 6. Implement. Run format, tidy, and tests locally. Iterate until clean.
-7. Open a PR citing FR/NFR and task ID.
-8. Mark the backlog item complete **only after** the PR is merged.
+7. Open a PR citing FR/NFR and task ID. **Flip the backlog checkbox (`[ ]` → `[x]`) for the task inside the same PR.** If the PR is abandoned or closed unmerged, the checkbox change dies with it — no separate bookkeeping PR is needed.
 
 ---
 
