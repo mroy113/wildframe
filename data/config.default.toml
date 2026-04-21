@@ -1,0 +1,156 @@
+# Wildframe default runtime configuration.
+#
+# This file is the authoritative default loaded when no user config is
+# found. See docs/CONFIG.md for the full contract: key semantics,
+# ranges, resolution order, unknown-key handling, and the change
+# policy.
+#
+# Resolution order (first hit wins, no merging):
+#   1. wildframe --config <path>          # CLI override
+#   2. $XDG_CONFIG_HOME/wildframe/config.toml
+#        (on macOS, falls back to
+#         ~/Library/Application Support/Wildframe/config.toml)
+#   3. this file (shipped with the application)
+#
+# A user config may override any subset of these keys. Missing keys
+# fall back to the values below. Unknown keys are a startup error —
+# typos must fail loudly, not silently, so provenance records match
+# the config the user intended.
+#
+# Leading `~` in a path expands to $HOME. No other shell expansions
+# are performed (no $VAR, no globs).
+#
+# Config is read once at startup. No hot-reload — changing this file
+# after Wildframe launches has no effect until the next launch.
+
+# -----------------------------------------------------------------------
+# Top-level: cross-cutting settings (logging, manifest output,
+# re-analysis default). Key names are cited by docs/STYLE.md §4 and
+# docs/BACKLOG.md S0-19/S0-21 and are intentionally top-level rather
+# than nested under a [logging] table.
+# -----------------------------------------------------------------------
+
+# spdlog daily-rotating file sink location. Parent directories are
+# created on first run. See docs/STYLE.md §4.3 for the rotation and
+# retention policy (daily at local midnight, 14 rotations retained).
+log_path = "~/Library/Logs/Wildframe/wildframe.log"
+
+# Threshold for both stdout and file sinks. Allowed values:
+#   "trace", "debug", "info", "warn", "error", "critical"
+# Defaults differ by build preset (docs/STYLE.md §4.2):
+#   release         → "info"
+#   debug / asan    → "debug"
+# The value below is the release default; debug/asan builds override
+# this at compile time. Set to "trace" only in a debug or asan build —
+# trace lines are eliminated from release binaries entirely
+# (SPDLOG_ACTIVE_LEVEL).
+log_level = "info"
+
+# Directory where per-batch JSON manifests (M6-05) are written. Each
+# run creates "<ISO-8601-timestamp>.json" inside this directory.
+# Parent directories are created on first run.
+manifest_dir = "~/Library/Application Support/Wildframe/batches/"
+
+# Default behavior when analysis is started on a directory that
+# already contains wildframe:* XMP sidecars (FR-10, S0-21). Allowed:
+#   "prompt"     — show the GUI dialog: skip / overwrite / cancel
+#   "skip"       — headless: leave existing sidecars untouched
+#   "overwrite"  — headless: re-run analysis and replace them
+# The per-file override in the detail view (M7-07) is unaffected by
+# this setting.
+reanalysis_default = "prompt"
+
+
+# -----------------------------------------------------------------------
+# [ingest] — directory walk (wildframe_ingest, FR-1, M1-02).
+# -----------------------------------------------------------------------
+[ingest]
+
+# Maximum directory-walk depth, following `find -maxdepth` semantics:
+#   1 = files directly in the selected directory only
+#   2 = one level of subdirectories
+#   …up to 16, which is the upper bound to prevent accidental
+#   disk-wide walks from a misrooted config.
+max_depth = 1
+
+
+# -----------------------------------------------------------------------
+# [detect] — object detection (wildframe_detect, FR-3, M3-*).
+#
+# Three of these keys are recorded verbatim in every sidecar's
+# wildframe_provenance:* namespace (docs/METADATA.md §4 and
+# docs/CONFIG.md §6). Changing them mid-project therefore changes the
+# provenance record on every subsequent sidecar.
+# -----------------------------------------------------------------------
+[detect]
+
+# Detector family. Both paths emit the same DetectionResult contract
+# (M3-04). Allowed values:
+#   "yolov11"      — YOLOv11 on COCO-80, filtered to class 14 ("bird")
+#   "megadetector" — MegaDetector v6 alternative (M3-06)
+# Recorded in provenance as "YOLOv11" or "MegaDetector" (canonical
+# spelling; the config stays lowercase for consistency with other
+# string enums in this file).
+model = "yolov11"
+
+# ONNX Runtime execution provider. Allowed values:
+#   "coreml" — CoreML with CPU fallback (handoff §5 default)
+#   "cpu"    — force CPU (useful for deterministic benchmarking)
+# Recorded in provenance as "CoreML" or "CPU".
+execution_provider = "coreml"
+
+# Minimum per-box confidence retained after postprocessing. Boxes
+# below this threshold are dropped before NMS (M3-03). Range [0.0,
+# 1.0]. Written verbatim into
+# wildframe_provenance:detection_confidence_threshold.
+confidence_threshold = 0.25
+
+# Non-max-suppression IoU threshold (M3-03). A candidate box is
+# dropped if its IoU with any higher-scoring retained box exceeds
+# this value. Range [0.0, 1.0]. Written verbatim into
+# wildframe_provenance:detection_iou_threshold.
+iou_threshold = 0.45
+
+
+# -----------------------------------------------------------------------
+# [focus] — classical image-quality scoring (wildframe_focus, FR-4,
+# M4-*).
+#
+# The numeric defaults in this section are PROVISIONAL: S0-18 ships
+# the key names and reasonable placeholders so users can see every
+# configurable knob today, but the authoritative defaults are frozen
+# by the M4 PRs that own the algorithms:
+#   laplacian_saturation            → M4-02
+#   edge_clipping_tolerance_pixels  → M4-04
+#   [focus.keeper_weights] table    → M4-05
+# Each of those PRs updates both this file and docs/CONFIG.md §3.4 in
+# the same commit. Do not tune these values against the placeholders
+# below — wait for the M4 locks.
+# -----------------------------------------------------------------------
+[focus]
+
+# Saturation point for the Variance-of-Laplacian → [0.0, 1.0] mapping
+# (M4-02). Variance at or above this value maps to 1.0; below it, the
+# mapping is linear from 0. Higher value = stricter "sharp"
+# definition. Must be > 0.0.
+laplacian_saturation = 1000.0
+
+# Pixel distance within which a bbox edge is considered to "touch"
+# the corresponding image edge (M4-04, docs/METADATA.md §3.2).
+# Measured against the preview image, not the original RAW. Range
+# [0, 64].
+edge_clipping_tolerance_pixels = 8
+
+# Weights for the keeper-score combination formula (M4-05).
+#
+# Invariants (validated at startup):
+#   - Every weight is in [0.0, 1.0].
+#   - focus + motion_blur + subject_size sums to 1.0 within 1e-6 so
+#     the pre-penalty score stays in [0.0, 1.0].
+#   - edge_clipping_penalty is subtracted per clipped edge after the
+#     weighted sum; the final keeper_score is clamped to [0.0, 1.0].
+[focus.keeper_weights]
+focus                 = 0.4
+motion_blur           = 0.3
+subject_size          = 0.3
+edge_clipping_penalty = 0.2

@@ -132,7 +132,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-5
   - Section added to `docs/STYLE.md` specifying: level semantics (trace/debug/info/warn/error/critical), when to use each, default level for release vs debug builds, log file path and rotation policy (consumes S0-19 output), module tag conventions. Agents follow this spec when adding log lines.
 
-- [ ] **S0-18** — TOML runtime config specification
+- [x] **S0-18** — TOML runtime config specification
   - Deps: S0-01, S0-02
   - Size: M
   - Satisfies: FR-11
