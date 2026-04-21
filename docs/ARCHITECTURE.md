@@ -89,11 +89,6 @@ detail:
 | `wildframe_orchestrator` | nlohmann/json, spdlog | `wildframe::orchestrator::OrchestratorError` |
 | `wildframe` (GUI) | Qt 6 Widgets, tomlplusplus | (GUI boundary — surfaces in the UI) |
 
-A module that needs another module's third-party library is a design
-smell — the library ownership line was drawn wrong. Raise a plan-
-change proposal per `CONTRIBUTING.md` §Plan change proposals before
-crossing the line.
-
 ---
 
 ## 2. Module purposes
