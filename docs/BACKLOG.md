@@ -95,7 +95,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-2
   - **Agent directive: do not pick up this task unless the customer explicitly asks for it by ID.** Unblocking requires the customer to provide the source CR3s; an agent starting this task without that input will stall. When the customer signals readiness, acquire CR3s for category (4) motion-blurred bird (visible bird large enough to detect, clearly motion-blurred — low Laplacian variance and low FFT high-frequency energy) and category (5) non-bird false-positive magnet (bird statue, sign, decoy, or carving that a COCO-trained YOLO could plausibly classify as "bird"). Upload as assets to a `fixtures-vN+1` release, pin in `tools/fetch_fixtures.cmake`, update `docs/FIXTURES.md` §2 with filename, size, intent, and dependent-test list. Acceptance criteria detailed in `docs/FIXTURES.md` §4.
 
-- [ ] **S0-13** — CI: GitHub Actions, macOS runner
+- [x] **S0-13** — CI: GitHub Actions, macOS runner
   - Deps: S0-04, S0-05, S0-06
   - Size: M
   - Satisfies: NFR-7, NFR-8
