@@ -7,6 +7,4 @@
 /// scoring over the primary subject crop. Concrete APIs land with tasks
 /// M4-01..M4-07.
 
-namespace wildframe::focus {
-
-}  // namespace wildframe::focus
+namespace wildframe::focus {}  // namespace wildframe::focus

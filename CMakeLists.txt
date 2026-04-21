@@ -23,24 +23,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # out of the box (NFR-8).
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Resolve CMAKE_CXX_CLANG_TIDY to an absolute path when the `tidy` preset
-# (or any caller) has asked for clang-tidy. Apple Command Line Tools does
-# not ship clang-tidy, and Homebrew's `llvm` formula is keg-only, so a
-# bare `clang-tidy` would not be found in PATH on a default macOS setup.
-# Hinting at Homebrew's keg-only locations keeps the `tidy` preset working
-# without forcing developers to pollute PATH (which would shadow Apple's
-# clang/clang-format/clangd).
-if(CMAKE_CXX_CLANG_TIDY)
-    find_program(WILDFRAME_CLANG_TIDY_EXECUTABLE
-        NAMES clang-tidy
-        HINTS
-            /opt/homebrew/opt/llvm/bin
-            /usr/local/opt/llvm/bin
-        DOC "Path to clang-tidy (NFR-8 static-analysis gate)"
-        REQUIRED
-    )
-    set(CMAKE_CXX_CLANG_TIDY "${WILDFRAME_CLANG_TIDY_EXECUTABLE}" CACHE STRING "" FORCE)
-endif()
+# clang-tidy / clang-format wiring and the `format`/`format-check` targets.
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(ClangTooling)
 
 # Internal static-library modules (see handoff doc §10).
 add_subdirectory(libs/ingest)

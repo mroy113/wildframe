@@ -8,6 +8,4 @@
 /// `wildframe_provenance:*`, and `wildframe_user:*` namespaces. Concrete
 /// APIs land with tasks M5-01..M5-11.
 
-namespace wildframe::metadata {
-
-}  // namespace wildframe::metadata
+namespace wildframe::metadata {}  // namespace wildframe::metadata
