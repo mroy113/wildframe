@@ -92,7 +92,7 @@ marginal benefit from an alternative.
 **Notes.**
 
 - Getters drop the `Get` prefix when they are pure accessors on a value
-  type (`box.area()`, not `box.GetArea()`), matching Google's
+  type (`box.Area()`, not `box.GetArea()`), matching Google's
   "short, trivial accessor" carve-out. Non-trivial accessors and all
   setters use the verb prefix (`LoadSession()`, `SetThreshold()`).
 - `snake_case_` trailing-underscore applies to `private:` and

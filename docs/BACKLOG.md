@@ -160,6 +160,12 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: FR-10
   - **Decided:** default is **prompt-per-batch** with three batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and a per-file override available from the detail view. Chosen option recorded in the batch manifest and on each affected sidecar via `wildframe_user:reanalysis_policy_used`. Overridable via TOML config key `reanalysis_default` for headless/automated runs.
 
+- [ ] **S0-22** — `LICENSE` file + `vcpkg.json` license field
+  - Deps: S0-08
+  - Size: S
+  - Satisfies: §15 (risks, licensing posture)
+  - Per [docs/LICENSING.md §1.1](LICENSING.md), the GPL-3.0-or-later decision is recorded in prose but not machine-readable. Add the full GPL-3.0-or-later license text at repo root as `LICENSE`, and set `"license": "GPL-3.0-or-later"` in `vcpkg.json` (currently `null`). Identified by the 2026-04-21 Sprint 0 infrastructure review §5.
+
 ---
 
 ## Module 1 — `wildframe_ingest` (FR-1)
@@ -493,6 +499,12 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Size: M
   - Satisfies: FR-10
   - On batch start, scan for existing `wildframe:*` sidecars. If any exist, show modal with three options (skip already-analyzed, overwrite all, cancel) and a count of how many files are affected. Per-file override is exposed later from the detail view (part of M7-07). Decision recorded to manifest and `wildframe_user:reanalysis_policy_used`.
+
+- [ ] **M7-11** — Trim GUI link line to architectural contract
+  - Deps: M7-01
+  - Size: S
+  - Satisfies: NFR-3, NFR-6
+  - [src/CMakeLists.txt](../src/CMakeLists.txt) currently links the stub `wildframe` executable against all six static libraries. [docs/ARCHITECTURE.md §1](ARCHITECTURE.md) specifies the GUI depends only on `wildframe::orchestrator` and `wildframe::metadata`; the other four are indirect. Once M7-01 introduces real GUI code, remove the direct links to `wildframe::ingest`, `wildframe::raw`, `wildframe::detect`, `wildframe::focus` so the module boundary is enforced by the build, not just documented. Identified by the 2026-04-21 Sprint 0 infrastructure review §5.
 
 ---
 
