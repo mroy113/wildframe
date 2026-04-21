@@ -105,9 +105,12 @@ has the SHA256 pinned in `tools/fetch_fixtures.cmake`.
 
 ---
 
-## 4. Pending fixtures
+## 4. Pending fixtures (S0-12b)
 
-Two categories from the S0-12 spec are not yet acquired:
+Two categories from the S0-12 spec are split to follow-up task
+**S0-12b** in `docs/BACKLOG.md`. The directive on S0-12b is explicit:
+**agents do not pick up this task unless the customer asks for it by
+ID** — it requires customer-provided CR3s as input.
 
 - **fixture_04 motion-blurred bird.** Needs a CR3 where the bird is
   large enough to detect but clearly motion-blurred (wing-flap or
