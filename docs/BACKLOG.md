@@ -29,7 +29,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §5 (tech stack), NFR-6
   - Add manifest mode `vcpkg.json` at repo root. Pin: libraw, exiv2, opencv, onnxruntime, qt6-base, qt6-widgets, nlohmann-json, spdlog, gtest. Document exact pinned versions in the PR body.
 
-- [ ] **S0-03** — Top-level `CMakeLists.txt` with empty static-lib targets
+- [x] **S0-03** — Top-level `CMakeLists.txt` with empty static-lib targets
   - Deps: S0-02
   - Size: M
   - Satisfies: §10, §11, NFR-6
