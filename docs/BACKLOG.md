@@ -53,7 +53,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-8
   - Enable the check set in NFR-8. Run against a representative sample (write a 200-line throwaway module). Disable only checks that are unequivocally noisy; document each disabled check inline in `.clang-tidy` with a one-line justification.
 
-- [ ] **S0-07** — `docs/STYLE.md`
+- [x] **S0-07** — `docs/STYLE.md`
   - Deps: S0-01
   - Size: M
   - Satisfies: NFR-7
