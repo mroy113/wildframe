@@ -14,3 +14,9 @@ build/_models/
 *.swp
 *.swo
 *~
+
+# Claude Code machine-local overrides. `.claude/commands/` and any future
+# shared `.claude/settings.json` are tracked (CLAUDE.md §8 points at
+# `.claude/commands/review.md`); per-developer permission allowlists and
+# env overrides belong in `settings.local.json` and stay untracked.
+.claude/settings.local.json
