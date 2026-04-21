@@ -83,11 +83,17 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §11 (model assets), §15 (licensing)
   - CMake module called during configure. Downloads YOLOv11 ONNX from a pinned URL to `build/_models/yolov11.onnx`. Verifies SHA256. Caches on re-run. Idempotent. Fails configure with a clear message if the download fails.
 
-- [ ] **S0-12** — Test fixture policy + initial CR3 fixture set
+- [x] **S0-12** — Test fixture policy + initial CR3 fixture set
   - Deps: S0-01
   - Size: M
   - Satisfies: NFR-2
-  - Customer decision: commit CR3 fixtures under Git LFS, or fetch at test-setup time (same pattern as models)? Document the chosen approach. Acquire fixtures covering: (1) clear bird in frame, (2) no bird, (3) small distant bird, (4) motion-blurred bird, (5) non-bird false-positive magnet (statue/sign). Each ≤10 MB if possible.
+  - Customer decision recorded: fetch at configure time, mirroring S0-11's models pattern. Policy documented in `docs/FIXTURES.md`. `tools/fetch_fixtures.cmake` pins fixtures by URL + SHA256 with an idempotent cache. Fixtures acquired for categories (1) clear bird, (2) no bird, (3) small distant bird. Categories (4) motion-blurred bird and (5) non-bird false-positive magnet are split to **S0-12b** — customer did not have matching CR3s on hand.
+
+- [ ] **S0-12b** — Acquire remaining CR3 fixtures (motion-blurred bird, false-positive magnet)
+  - Deps: S0-12
+  - Size: S
+  - Satisfies: NFR-2
+  - **Agent directive: do not pick up this task unless the customer explicitly asks for it by ID.** Unblocking requires the customer to provide the source CR3s; an agent starting this task without that input will stall. When the customer signals readiness, acquire CR3s for category (4) motion-blurred bird (visible bird large enough to detect, clearly motion-blurred — low Laplacian variance and low FFT high-frequency energy) and category (5) non-bird false-positive magnet (bird statue, sign, decoy, or carving that a COCO-trained YOLO could plausibly classify as "bird"). Upload as assets to a `fixtures-vN+1` release, pin in `tools/fetch_fixtures.cmake`, update `docs/FIXTURES.md` §2 with filename, size, intent, and dependent-test list. Acceptance criteria detailed in `docs/FIXTURES.md` §4.
 
 - [ ] **S0-13** — CI: GitHub Actions, macOS runner
   - Deps: S0-04, S0-05, S0-06
