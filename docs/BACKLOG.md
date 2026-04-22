@@ -190,17 +190,17 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Satisfies: NFR-6, handoff §5 threading strategy
   - Wildframe's runtime has exactly two application-owned threads per [docs/ARCHITECTURE.md §5](ARCHITECTURE.md#5-threading-model): Qt main + one orchestrator worker, with a job queue and cancel flag across them. That is precisely the surface TSan exists to cover. Add a `tsan` preset (`-fsanitize=thread -fno-omit-frame-pointer`) and a CI job that runs the orchestrator's integration tests (M6-07) under it. **Do not start before M6-03** — without a real worker thread the job is a no-op. Known constraints: TSan is incompatible with ASan (separate job), and Qt's own instrumentation may surface benign warnings — triage into a small per-test suppression list rather than globally disabling checks.
 
-- [ ] **S1-04** — Run clang-tidy from debug's `compile_commands.json` instead of a dedicated preset
+- [x] **S1-04** — Run clang-tidy from debug's `compile_commands.json` instead of a dedicated preset
   - Deps: S0-13, S1-01
   - Size: S
   - Satisfies: NFR-6 (CI latency), NFR-8 (static-analysis gate)
-  - Today the `tidy` preset in [CMakePresets.json](../CMakePresets.json) inherits `debug` and layers `CMAKE_CXX_CLANG_TIDY=clang-tidy` across every TU. That forces a full second project compile — the debug build has already produced objects for the identical TUs in the identical configuration, so the work duplicates. With S1-01 collapsing the per-preset configure cost, the redundant compile becomes the next-longest step as the module tree grows. Replace the preset-based flow with `run-clang-tidy` (or `clang-tidy -p build/debug`) invoked against debug's existing `compile_commands.json`, keeping the same `.clang-tidy` suppression set (S0-06). Keep the `tidy` preset in `CMakePresets.json` for local use where `CMAKE_CXX_CLANG_TIDY` inline gives a tighter edit-loop.
+  - Landed in the same PR as S0-13 / S1-01. The `Clang-tidy gate` step in [.github/workflows/ci.yml](../.github/workflows/ci.yml) now invokes `run-clang-tidy -p build/debug`, reusing debug's `compile_commands.json` rather than reconfiguring and recompiling the project under the `tidy` preset. The `tidy` preset remains in [CMakePresets.json](../CMakePresets.json) for local editor-loop use where inline tidying is handier than a post-hoc sweep.
 
-- [ ] **S1-05** — Move `format-check` before the first expensive build for fail-fast
+- [x] **S1-05** — Move `format-check` before the first expensive build for fail-fast
   - Deps: S0-13
   - Size: XS
   - Satisfies: NFR-6 (developer ergonomics), NFR-7 (formatter)
-  - [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs `format-check` after `Build (debug)` and `Test (debug)`, so a formatting violation burns both of those steps before reporting. The target only depends on configure (it invokes `clang-format --dry-run` over the sources discovered at configure time), so moving it to immediately after `Configure (debug)` surfaces violations in under a minute. Near-zero code churn; the win is small in absolute time but the cadence penalty on "forgot to run format" PRs drops from minutes to seconds.
+  - Landed in the same PR as S0-13. `format-check` now runs immediately after `Configure (debug)`, before `Build (debug)` / `Test (debug)`. A formatting violation surfaces in seconds instead of after a full debug build + test pass.
 
 ---
 
