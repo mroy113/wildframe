@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.24)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+# Platform-minimums dispatcher, pre-project phase. Sets things that
+# must be visible to the compiler/feature probes project() triggers
+# (e.g. CMAKE_OSX_DEPLOYMENT_TARGET on macOS). See
+# cmake/PlatformMinimums.cmake and cmake/platforms/<os>.cmake.
+set(WILDFRAME_PLATFORM_PHASE "pre_project")
+include(PlatformMinimums)
+
 # vcpkg toolchain: pick it up from VCPKG_ROOT if the caller did not pass
 # -DCMAKE_TOOLCHAIN_FILE explicitly. Must happen before project().
 # Presets (S0-04) will wire this explicitly; this hook keeps a bare
@@ -15,6 +24,13 @@ project(wildframe
     LANGUAGES CXX
 )
 
+# Platform-minimums dispatcher, post-project phase. Runs compiler /
+# toolchain version gates now that CMAKE_CXX_COMPILER_ID and
+# CMAKE_CXX_COMPILER_VERSION are populated.
+set(WILDFRAME_PLATFORM_PHASE "post_project")
+include(PlatformMinimums)
+unset(WILDFRAME_PLATFORM_PHASE)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -24,7 +40,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # clang-tidy / clang-format wiring and the `format`/`format-check` targets.
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(ClangTooling)
 
 # Configure-time fetch of pinned ONNX model weights (S0-11).
