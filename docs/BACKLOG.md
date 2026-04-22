@@ -168,6 +168,18 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 
 ---
 
+## Sprint 1 — Infrastructure follow-ups
+
+Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives here to stay visible and get picked up once module work begins to feel the friction.
+
+- [ ] **S1-01** — Cache `build/_vcpkg_installed/` directly in CI
+  - Deps: S0-13
+  - Size: S
+  - Satisfies: NFR-6 (developer ergonomics — CI latency drives review cadence)
+  - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) relies on vcpkg's `x-gha` binary cache plus a shared `VCPKG_INSTALLED_DIR`. That still pays a per-run unpack cost (~15–20 min steady state, dominated by Qt 6) because the install tree itself is not cached across runs. Add an `actions/cache` step keyed on `hashFiles('vcpkg.json')` + runner OS/arch that caches the unpacked tree; on hit the first configure becomes near-instant. Trade-off: the tree is ~3–5 GB and eats into the 10 GB per-repo Actions cache quota, so the `x-gha` binary archives get less room. Pull the trigger when steady-state CI wall time crosses ~45 min or becomes recurring review friction — leave the binary cache doing its job until then.
+
+---
+
 ## Module 1 — `wildframe_ingest` (FR-1)
 
 - [ ] **M1-01** — `ImageJob` public struct
