@@ -218,7 +218,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ## Module 1 — `wildframe_ingest` (FR-1)
 
-- [ ] **M1-01** — `ImageJob` public struct
+- [x] **M1-01** — `ImageJob` public struct
   - Deps: S0-03
   - Size: S
   - Public header: `libs/ingest/include/wildframe/ingest/image_job.hpp`. Fields: absolute path, format tag (enum, `Cr3` only in MVP), file size, content hash (optional, deferred). Value type, copyable, immutable.

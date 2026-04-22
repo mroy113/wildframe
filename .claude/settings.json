@@ -3,7 +3,21 @@
     "allow": [
       "Bash(cmake --preset *)",
       "Bash(cmake --build --preset *)",
-      "Bash(ctest --preset *)"
+      "Bash(ctest --preset *)",
+      "Bash(VCPKG_ROOT=* cmake --preset *)",
+      "Bash(VCPKG_ROOT=* cmake --build --preset *)",
+      "Bash(VCPKG_ROOT=* ctest --preset *)",
+      "Bash(PATH=* cmake --preset *)",
+      "Bash(PATH=* cmake --build --preset *)",
+      "Bash(PATH=* ctest --preset *)",
+      "Bash(PATH=* VCPKG_ROOT=* cmake --preset *)",
+      "Bash(PATH=* VCPKG_ROOT=* cmake --build --preset *)",
+      "Bash(PATH=* VCPKG_ROOT=* ctest --preset *)",
+      "Bash(VCPKG_ROOT=* PATH=* cmake --preset *)",
+      "Bash(VCPKG_ROOT=* PATH=* cmake --build --preset *)",
+      "Bash(VCPKG_ROOT=* PATH=* ctest --preset *)",
+      "Bash(/usr/local/opt/llvm/bin/run-clang-tidy *)",
+      "Bash(/usr/local/opt/llvm/bin/clang-format *)"
     ]
   }
 }
