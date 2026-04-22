@@ -179,6 +179,7 @@ The parser's behavior on malformed input:
 | `focus.keeper_weights` sub-keys do not sum to `1.0` within tolerance | Startup error naming the three weights and their sum. Tolerance is `1e-6`. |
 | Partial file missing a key that has a default | Silent — default applies (§1.4). |
 | Partial file missing a key with no default | Startup error — every required key in §3 has a default, so this is reserved for future required-without-default additions. |
+| `log_path` or `manifest_dir` contains `~` but `$HOME` is unset or empty | Startup error naming the key — Wildframe cannot write its audit trail to an unresolved path (S0-19). |
 
 "Startup error" means: Wildframe refuses to run, prints a one-line
 diagnostic to stderr (this is the one place stderr is used; see
