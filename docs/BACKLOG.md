@@ -541,6 +541,25 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 
 ---
 
+## Post-MVP — Planning
+
+Tasks here are **not** part of MVP and must not be picked up until `I-05` is signed off. They exist to capture scope-expansion questions the customer wants parked, not commitments.
+
+- [ ] **P2-01** — Scope cross-compilation: platforms, hardware, execution providers
+  - Deps: I-05
+  - Size: M (planning, not implementation)
+  - Satisfies: §3 (platform), §15 (risks)
+  - Deliverable: a decision record (plan-change PR per CONTRIBUTING.md if the answer changes the handoff) covering:
+    - Which host platforms to support beyond macOS (Linux-on-x86_64, Linux-on-ARM, Windows-on-x86_64, Windows-on-ARM) and why.
+    - Target hardware profiles per platform: CPU arch, minimum RAM, GPU/NPU availability (NVIDIA CUDA, AMD ROCm, Intel NPU, Windows DirectML, etc.).
+    - Execution-provider choice per target — CoreML is Apple-only, so `wildframe_detect` (M3) needs a per-platform EP decision. Implications for the `DetectConfig` schema and the primary NFR-1 perf target.
+    - GUI strategy per target — Qt 6 Widgets works on Linux/Windows, but packaging, signing, and dynamic-linking obligations (LGPL per docs/LICENSING.md) differ.
+    - Build-infra impact: CI matrix, vcpkg triplets, fixture availability per platform, `tools/fetch_models.cmake` mirroring.
+    - Concrete follow-up tasks (populate `cmake/platforms/linux.cmake` and `cmake/platforms/windows.cmake` per S0-20, revisit `cmake/ClangTooling.cmake` Homebrew-isms, CI jobs, triplet selection) with sizing so they can land in a sprint.
+  - **Agent directive: do not start before I-05 is signed off.** This is a scoping task, not implementation; picking it up early is the exact scope creep CLAUDE.md §5 forbids.
+
+---
+
 ## Conventions for adding tasks
 
 - New tasks are appended at the end of the relevant section.
