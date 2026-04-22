@@ -211,8 +211,9 @@ Future integration (Phase 3+): the Wildframe GUI may invoke raw-ingest as a subp
 
 ### FR-10: Re-analysis policy
 - When the user runs analysis on a directory that already contains `wildframe:*` XMP sidecars from a prior run, Wildframe must not silently overwrite them.
-- Default behavior (subject to customer confirmation in Sprint 0): prompt the user with batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and allow per-file override from the detail view.
-- The chosen option is recorded in the batch manifest so re-runs are traceable.
+- Default behavior: prompt the user with batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and allow per-file override from the detail view. Locked by S0-21.
+- The chosen option is recorded in the batch manifest so re-runs are traceable, and on each affected sidecar via `wildframe_user:reanalysis_policy_used` (§13).
+- The default is overridable via TOML config key `reanalysis_default` (`prompt` | `skip` | `overwrite`, default `prompt`) for headless/automated runs; see `docs/CONFIG.md` §3.1.
 
 ### FR-11: Runtime configuration
 - All user-tunable values (keeper-score weights, detection confidence threshold, NMS IoU threshold, recursion depth, detector selection, execution provider selection, output paths) live in a single **TOML** configuration file loaded at application startup.

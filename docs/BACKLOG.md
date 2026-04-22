@@ -154,11 +154,11 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-6 (reproducibility), §3 (platform)
   - **Decided:** minimum macOS **13 (Ventura)**. Minimum Apple Clang: 15. Minimum CMake: 3.24. Ninja required. vcpkg pinned to a specific commit. Enforced by top-level `CMakeLists.txt` via `CMAKE_OSX_DEPLOYMENT_TARGET=13.0` and compiler version check. Record in `docs/DEV_SETUP.md`.
 
-- [ ] **S0-21** — Re-analysis behavior
-  - Deps: S0-01, M5-09
+- [x] **S0-21** — Re-analysis behavior
+  - Deps: S0-01
   - Size: S
   - Satisfies: FR-10
-  - **Decided:** default is **prompt-per-batch** with three batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and a per-file override available from the detail view. Chosen option recorded in the batch manifest and on each affected sidecar via `wildframe_user:reanalysis_policy_used`. Overridable via TOML config key `reanalysis_default` for headless/automated runs.
+  - **Decided:** default is **prompt-per-batch** with three batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and a per-file override available from the detail view. Chosen option recorded in the batch manifest and on each affected sidecar via `wildframe_user:reanalysis_policy_used`. Overridable via TOML config key `reanalysis_default` for headless/automated runs. Policy surface already landed across [bird_photo_ai_project_handoff.md §FR-10](../bird_photo_ai_project_handoff.md), [docs/CONFIG.md §3.1](CONFIG.md) (`reanalysis_default`), [docs/METADATA.md §5](METADATA.md) (`wildframe_user:reanalysis_policy_used`), [docs/ARCHITECTURE.md §3.1](ARCHITECTURE.md), and [data/config.default.toml](../data/config.default.toml) — implementation consumers are M6-05 (manifest) and M7-10 (prompt dialog), which depend on S0-21 + M5-09.
 
 - [x] **S0-22** — `LICENSE` file + `vcpkg.json` license field
   - Deps: S0-08
