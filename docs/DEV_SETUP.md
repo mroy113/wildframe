@@ -10,9 +10,10 @@ toolchain minimums from **S0-20**.
 ## 1. Toolchain minimums
 
 Recorded from `bird_photo_ai_project_handoff.md` §16.24 and enforced by
-the top-level [CMakeLists.txt](../CMakeLists.txt). Building on a system
-below any of these lines fails at CMake configure time with an error
-message that points back here.
+[cmake/PlatformMinimums.cmake](../cmake/PlatformMinimums.cmake), which
+dispatches to [cmake/platforms/macos.cmake](../cmake/platforms/macos.cmake).
+Building on a system below any of these lines fails at CMake configure
+time with an error message that points back here.
 
 | Requirement | Minimum | How it is enforced |
 |---|---|---|
@@ -22,9 +23,11 @@ message that points back here.
 | Ninja | any recent release | the only generator wired in [CMakePresets.json](../CMakePresets.json) |
 | vcpkg registry | `builtin-baseline` SHA in [vcpkg.json](../vcpkg.json) | resolved at configure time by vcpkg manifest mode |
 
-The compiler gate is `APPLE`-guarded. On non-Apple hosts the gate is
-skipped — vcpkg itself refuses to configure because [vcpkg.json](../vcpkg.json)
-sets `"supports": "osx"`, so a non-macOS build stops earlier.
+The per-platform gate lives under [cmake/platforms/](../cmake/platforms/):
+`macos.cmake` is populated; `linux.cmake` and `windows.cmake` are stubs
+that error out at configure time (Linux/Windows are out of MVP scope
+per CLAUDE.md §6). Cross-compile support is expected to land after
+Phase 2 by populating the stubs and adding a row to this table.
 
 ## 2. vcpkg pin strategy
 
