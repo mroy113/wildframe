@@ -233,6 +233,46 @@ otherwise:
 
 When a straightforward concrete implementation works, use it.
 
+### 2.8 Macros
+
+Macros are the **last resort**, not a convenience. Use one only when
+the feature you need cannot be expressed as a function, a `constexpr`
+value, an `inline` variable, or a template — the prototypical case
+being preprocessor-level conditional compilation that must see or
+discard token sequences before they are parsed (e.g. `spdlog`'s
+`SPDLOG_ACTIVE_LEVEL` compile-time level strip in §4.2, which
+requires the argument list to literally disappear from the
+translation unit). If a non-macro alternative exists at all, prefer
+it, even at some verbosity cost at the call site.
+
+When a macro is justified:
+
+- Scope the `NOLINT(cppcoreguidelines-macro-usage)` suppression to
+  exactly the macro (or `NOLINTBEGIN`/`NOLINTEND` block covering
+  just the macro definitions), never file-wide.
+- Leave a comment at the definition stating which non-macro
+  alternative was considered and why it is insufficient.
+
+### 2.9 Wrapping dependency types
+
+Do not wrap a backend library's public types (enums, status codes,
+error types, option structs) in a parallel Wildframe type unless the
+wrapper does **at least one** of:
+
+- (a) Narrow the surface area exposed to callers — e.g. hiding a
+  large enum behind a curated subset we actually use.
+- (b) Decouple callers from a dep we genuinely intend to swap — not
+  a theoretical "what if we change libraries someday" motivation,
+  but one tied to a concrete forecast in the handoff doc or backlog.
+- (c) Add invariants the backend type lacks — e.g. a constructor
+  that rejects values the backend would accept.
+
+A wrapper that only renames symbols for namespace aesthetics, or
+"keeps our API clean" without narrowing, decoupling, or adding
+invariants, is NFR-6 debt. Type aliases (`using level = spdlog::level;`)
+are the honest way to shorten a qualified name without the
+maintenance cost of a real wrapping layer.
+
 ---
 
 ## 3. Exception policy
