@@ -1,6 +1,7 @@
 #include "wildframe/log/log.hpp"
 
 #include <gtest/gtest.h>
+#include <spdlog/common.h>
 // misc-include-cleaner false-positives on this include: we do use
 // `spdlog::sinks::ostream_sink_mt` directly below, and the type is
 // declared in this header.
@@ -33,7 +34,7 @@ CaptureSink make_capture_sink() {
 
 void init_with_capture(
     const std::shared_ptr<spdlog::sinks::ostream_sink_mt>& sink,
-    wildframe::log::Level level = wildframe::log::Level::Info) {
+    spdlog::level::level_enum level = spdlog::level::info) {
   wildframe::log::Config cfg;
   cfg.level = level;
   cfg.enable_stdout = false;
@@ -106,7 +107,7 @@ TEST(WildframeLog, EmittedLineMatchesStylePatternAndTag) {
 
 TEST(WildframeLog, AllLevelsCompileAndRouteToTaggedLogger) {
   auto cap = make_capture_sink();
-  init_with_capture(cap.sink, wildframe::log::Level::Trace);
+  init_with_capture(cap.sink, spdlog::level::trace);
 
   WF_TRACE(wildframe::log::detect, "t {}", 1);
   WF_DEBUG(wildframe::log::detect, "d {}", 2);

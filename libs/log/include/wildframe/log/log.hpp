@@ -35,7 +35,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cstdint>
 #include <filesystem>
 #include <string_view>
 #include <utility>
@@ -43,24 +42,15 @@
 
 namespace wildframe::log {
 
-/// Threshold applied to every registered logger at `init()`. Mirrors
-/// `spdlog::level::level_enum` but kept in our namespace so callers
-/// do not need to spell `spdlog::level::*`.
-enum class Level : std::uint8_t {
-  Trace,
-  Debug,
-  Info,
-  Warn,
-  Error,
-  Critical,
-  Off,
-};
-
 /// `init()` input. The orchestrator builds one of these from the
 /// TOML config (`log_path`, `log_level`) and passes it in.
 struct Config {
   /// Threshold applied to every module logger (`docs/STYLE.md` §4.2).
-  Level level = Level::Info;
+  /// Typed directly as `spdlog::level::level_enum`: the orchestrator
+  /// already maps the TOML `log_level` string into the backend
+  /// namespace, and a wrapping enum would be maintenance surface
+  /// without upside (NFR-6).
+  spdlog::level::level_enum level = spdlog::level::info;
 
   /// Daily-rotating file sink path. Empty disables the file sink.
   /// Default per `docs/STYLE.md` §4.3 is

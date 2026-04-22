@@ -15,6 +15,7 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -34,26 +35,6 @@ constexpr std::string_view kPattern = "%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%n] %v";
 constexpr std::array<std::string_view, 7> kModuleTags = {
     "ingest", "raw", "detect", "focus", "metadata", "orchestrator", "gui",
 };
-
-constexpr spdlog::level::level_enum to_spd_level(Level level) noexcept {
-  switch (level) {
-    case Level::Trace:
-      return spdlog::level::trace;
-    case Level::Debug:
-      return spdlog::level::debug;
-    case Level::Info:
-      return spdlog::level::info;
-    case Level::Warn:
-      return spdlog::level::warn;
-    case Level::Error:
-      return spdlog::level::err;
-    case Level::Critical:
-      return spdlog::level::critical;
-    case Level::Off:
-      return spdlog::level::off;
-  }
-  return spdlog::level::info;
-}
 
 }  // namespace
 
@@ -75,13 +56,12 @@ void init(const Config& cfg) {
     sinks.push_back(sink);
   }
 
-  const auto threshold = to_spd_level(cfg.level);
   const std::string pattern{kPattern};
   for (const auto tag : kModuleTags) {
     const std::string name{tag};
     auto logger =
         std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
-    logger->set_level(threshold);
+    logger->set_level(cfg.level);
     logger->set_pattern(pattern);
     // Flush on warn so an `error` or `critical` line is on disk
     // before the orchestrator writes the corresponding manifest row
@@ -95,20 +75,35 @@ void shutdown() noexcept { spdlog::drop_all(); }
 
 namespace detail {
 
-// `std::string{tag}` can throw `bad_alloc`; `noexcept` then routes that
-// to `std::terminate`, which is the behavior we want on this path
-// anyway (OOM during log lookup means the process is already doomed).
-// NOLINTNEXTLINE(bugprone-exception-escape)
 spdlog::logger* native(const Logger& handle) noexcept {
   const auto tag = handle.tag();
-  if (auto logger = spdlog::get(std::string{tag}); logger) {
-    return logger.get();
+
+  // `spdlog::get` takes a `const std::string&`, so the lookup
+  // allocates a short-lived key from our `string_view` tag. If
+  // construction throws (OOM, or theoretically `length_error` on an
+  // oversized tag), write a diagnostic and abort — there is no
+  // useful recovery from a failed log-path lookup, and silently
+  // returning null would violate the `noexcept` contract callers
+  // rely on. fputs/fwrite return values are intentionally discarded
+  // on this abort path.
+  try {
+    if (auto logger = spdlog::get(std::string{tag}); logger) {
+      return logger.get();
+    }
+  } catch (const std::exception& e) {
+    (void)std::fputs("wildframe::log: exception during logger lookup for tag '",
+                     stderr);
+    (void)std::fwrite(tag.data(), 1, tag.size(), stderr);
+    (void)std::fputs("': ", stderr);
+    (void)std::fputs(e.what(), stderr);
+    (void)std::fputs("\n", stderr);
+    std::abort();
   }
-  // A missing tag means either `wildframe::log::init()` has not run
-  // or the handle's tag is not in `docs/STYLE.md` §4.5 — both
-  // programming errors. Terminate loudly rather than silently log
-  // into the void. fputs/fwrite return values are intentionally
-  // discarded: we are on the abort path, so there is no recovery.
+
+  // Reaching here means `spdlog::get` returned null: either
+  // `wildframe::log::init()` has not run, or the handle's tag is not
+  // in `docs/STYLE.md` §4.5 — both programming errors. Terminate
+  // loudly rather than silently log into the void.
   (void)std::fputs("wildframe::log: no logger registered for tag '", stderr);
   // tag is a string_view and not guaranteed to be null-terminated,
   // so write the bytes directly.
