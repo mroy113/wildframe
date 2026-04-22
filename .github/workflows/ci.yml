@@ -33,7 +33,15 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded runs on PRs for fast feedback, but let main runs finish:
+  # the _vcpkg_installed cache is only saved at the end of a successful run,
+  # and GitHub Actions cache scoping means PRs can only inherit a cache from
+  # their own branch or the default branch. If back-to-back pushes to main
+  # keep cancelling the in-flight main run, main never writes a cache, and
+  # every new PR cold-builds vcpkg (~70 min) instead of restoring warm. This
+  # was the state observed before the fix: `gh api .../caches?ref=refs/heads/main`
+  # returned zero entries while PR caches existed in isolation.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -42,7 +50,7 @@ jobs:
   macos:
     name: macOS — build, test, format-check, clang-tidy
     runs-on: macos-14
-    timeout-minutes: 240
+    timeout-minutes: 200
     env:
       # Route vcpkg's binary cache through GitHub Actions cache.
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -130,10 +138,16 @@ jobs:
       - name: Test (debug)
         run: ctest --preset debug
 
+      # Release configure+build run only on push: main (post-merge validation).
+      # PRs don't need release correctness signal — debug catches the same
+      # compile/link errors; release is a packaging concern. Skipping it on PR
+      # also avoids the second cmake configure on the critical path.
       - name: Configure (release)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: cmake --preset release
 
       - name: Build (release)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: cmake --build --preset release
 
       # S1-04: run clang-tidy directly against debug's compile_commands.json
