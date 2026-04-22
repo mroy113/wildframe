@@ -15,6 +15,12 @@
 #                 feature parity with Apple Clang 15). Mirror the shape
 #                 of cmake/platforms/macos.cmake.
 # - Update docs/DEV_SETUP.md §1 to document the Linux row.
+# - Revisit cmake/ClangTooling.cmake: the Homebrew keg-only HINTS
+#   (/opt/homebrew/opt/llvm/bin, /usr/local/opt/llvm/bin) and the
+#   "brew install llvm" status message are macOS-only. find_program()
+#   still falls through to PATH so the file works on Linux today,
+#   but the hints and the message should be branched once this stub
+#   is populated.
 
 if(WILDFRAME_PLATFORM_PHASE STREQUAL "pre_project")
     # No-op: lets the dispatcher and vcpkg run through to the clearer
