@@ -321,7 +321,8 @@ something not listed is a bug.
 All application logging goes through **spdlog** (handoff §5, §NFR-5).
 S0-14 initializes one process-global pair of sinks — stdout and a
 daily-rotating file — both thread-safe. Agents add log lines by
-picking a level from §4.1 and using the module-tagged macro in §4.5.
+picking a level from §4.1 and using the module-tagged logger handle
+in §4.5.
 
 ### 4.1 Level semantics
 
@@ -425,28 +426,44 @@ Build-system helpers (`tools/fetch_models.cmake`,
 of scope — they use `message(STATUS …)` / `message(FATAL_ERROR …)`,
 not spdlog.
 
-**How a module picks up its tag.** S0-14 will provide one
-pre-registered logger per module, looked up by tag. Translation units
-select their tag by `#define`-ing `WILDFRAME_LOG_MODULE` before
-including the wildframe log header:
+**How a module picks up its tag.** S0-14 exposes one pre-registered
+`wildframe::log::Logger` handle per module tag at namespace scope.
+Callers use the handle's member functions for `info` / `warn` /
+`error` / `critical` — the function API is spdlog's idiomatic style
+(see the [spdlog FAQ][spdlog-faq]) and does not require per-TU
+`#define` plumbing.
 
 ```cpp
 // libs/detect/src/detect.cpp
-#define WILDFRAME_LOG_MODULE "detect"
 #include "wildframe/log/log.hpp"
 
-WILDFRAME_LOG_INFO("detect ready: ep={}", ep_name);
+namespace log = wildframe::log;
+
+log::detect.info("detect ready: ep={}", ep_name);
+log::detect.warn("skipped frame, confidence {} below threshold",
+                 score);
 ```
 
-The macros (`WILDFRAME_LOG_TRACE` / `_DEBUG` / `_INFO` / `_WARN` /
-`_ERROR` / `_CRITICAL`) resolve to a cached `spdlog::get(...)` call
-against the module tag. Agents use these macros — not `spdlog::`
-APIs directly — so the tag is exactly one string per TU and swapping
-the backing sink(s) later does not touch callers.
+Only `trace` and `debug` go through preprocessor macros —
+`WF_TRACE(handle, ...)` and `WF_DEBUG(handle, ...)` — because
+compile-time stripping via `SPDLOG_ACTIVE_LEVEL` (§4.2) requires
+macros. A function call would always compile, keeping trace-level
+format cost in release binaries; the macro form lets the
+preprocessor delete the call entirely.
+
+```cpp
+WF_TRACE(log::detect, "pre-NMS box count={}", n);
+```
+
+Agents use `wildframe::log::<tag>.*()` (and `WF_TRACE` / `WF_DEBUG`
+for `trace` / `debug`) — not `spdlog::` APIs directly — so the
+backing sink(s) can change later without touching callers.
 
 Do **not** embed the tag into the message string itself
 (`"[detect] …"`). The pattern already carries it in `[%n]`;
 duplicating doubles it up in every rotated file.
+
+[spdlog-faq]: https://github.com/gabime/spdlog/wiki/FAQ
 
 ### 4.6 What not to log
 
