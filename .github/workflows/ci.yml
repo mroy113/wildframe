@@ -34,10 +34,16 @@ jobs:
   macos:
     name: macOS — build, test, format-check, clang-tidy
     runs-on: macos-14
-    timeout-minutes: 180
+    timeout-minutes: 240
     env:
       # Route vcpkg's binary cache through GitHub Actions cache.
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      # Share a single install tree across all three presets. Without this,
+      # each preset's configure unpacks every port from the binary cache into
+      # its own build/<preset>/vcpkg_installed/, tripling the vcpkg cost per
+      # run (observed ~1 h per preset → ~3 h before the project compiles).
+      # All three presets use the same arm64-osx triplet, so sharing is safe.
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/build/_vcpkg_installed
       HOMEBREW_NO_AUTO_UPDATE: "1"
       HOMEBREW_NO_INSTALL_CLEANUP: "1"
 
