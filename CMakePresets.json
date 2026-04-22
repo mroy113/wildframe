@@ -9,11 +9,13 @@
         {
             "name": "_base",
             "hidden": true,
+            "description": "Shared base: Ninja generator, vcpkg toolchain, exported compile_commands.json, and a single vcpkg install tree at build/_vcpkg_installed shared across every preset that inherits this one. Sharing is safe only while every inheriting preset uses the same triplet (arm64-osx today) with no ABI-affecting flags; a sanitizer preset (e.g. S1-02 asan-ubsan, S1-03 tsan) must either give itself its own _vcpkg_installed_<variant> path or confirm its ABI matches what's already in the shared tree.",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
             "cacheVariables": {
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "VCPKG_INSTALLED_DIR": "${sourceDir}/build/_vcpkg_installed"
             }
         },
         {

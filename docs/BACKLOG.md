@@ -95,7 +95,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-2
   - **Agent directive: do not pick up this task unless the customer explicitly asks for it by ID.** Unblocking requires the customer to provide the source CR3s; an agent starting this task without that input will stall. When the customer signals readiness, acquire CR3s for category (4) motion-blurred bird (visible bird large enough to detect, clearly motion-blurred — low Laplacian variance and low FFT high-frequency energy) and category (5) non-bird false-positive magnet (bird statue, sign, decoy, or carving that a COCO-trained YOLO could plausibly classify as "bird"). Upload as assets to a `fixtures-vN+1` release, pin in `tools/fetch_fixtures.cmake`, update `docs/FIXTURES.md` §2 with filename, size, intent, and dependent-test list. Acceptance criteria detailed in `docs/FIXTURES.md` §4.
 
-- [ ] **S0-13** — CI: GitHub Actions, macOS runner
+- [x] **S0-13** — CI: GitHub Actions, macOS runner
   - Deps: S0-04, S0-05, S0-06
   - Size: M
   - Satisfies: NFR-7, NFR-8
@@ -172,11 +172,11 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 
 Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives here to stay visible and get picked up once module work begins to feel the friction.
 
-- [ ] **S1-01** — Cache `build/_vcpkg_installed/` directly in CI
+- [x] **S1-01** — Cache `build/_vcpkg_installed/` directly in CI
   - Deps: S0-13
   - Size: S
   - Satisfies: NFR-6 (developer ergonomics — CI latency drives review cadence)
-  - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) relies on vcpkg's `x-gha` binary cache plus a shared `VCPKG_INSTALLED_DIR`. That still pays a per-run unpack cost (~15–20 min steady state, dominated by Qt 6) because the install tree itself is not cached across runs. Add an `actions/cache` step keyed on `hashFiles('vcpkg.json')` + runner OS/arch that caches the unpacked tree; on hit the first configure becomes near-instant. Trade-off: the tree is ~3–5 GB and eats into the 10 GB per-repo Actions cache quota, so the `x-gha` binary archives get less room. Pull the trigger when steady-state CI wall time crosses ~45 min or becomes recurring review friction — leave the binary cache doing its job until then.
+  - Landed in the same PR as S0-13 after the first green run clocked in at ~3 h wall time — well past the "~45 min friction" trigger. See [.github/workflows/ci.yml](../.github/workflows/ci.yml): the `Cache vcpkg_installed tree` step keys on `vcpkg.json` plus the S0-20 platform-minimums CMake files, with `restore-keys` allowing a partial hit when only `vcpkg.json` changes so vcpkg reconciles the delta via `x-gha` instead of rebuilding Qt 6 from scratch.
 
 - [ ] **S1-02** — CI job: AddressSanitizer + UndefinedBehaviorSanitizer
   - Deps: S0-13, M1-05 (needs at least one real test suite to exercise — otherwise the job passes trivially)
@@ -189,6 +189,30 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Size: S
   - Satisfies: NFR-6, handoff §5 threading strategy
   - Wildframe's runtime has exactly two application-owned threads per [docs/ARCHITECTURE.md §5](ARCHITECTURE.md#5-threading-model): Qt main + one orchestrator worker, with a job queue and cancel flag across them. That is precisely the surface TSan exists to cover. Add a `tsan` preset (`-fsanitize=thread -fno-omit-frame-pointer`) and a CI job that runs the orchestrator's integration tests (M6-07) under it. **Do not start before M6-03** — without a real worker thread the job is a no-op. Known constraints: TSan is incompatible with ASan (separate job), and Qt's own instrumentation may surface benign warnings — triage into a small per-test suppression list rather than globally disabling checks.
+
+- [x] **S1-04** — Run clang-tidy from debug's `compile_commands.json` instead of a dedicated preset
+  - Deps: S0-13, S1-01
+  - Size: S
+  - Satisfies: NFR-6 (CI latency), NFR-8 (static-analysis gate)
+  - Landed in the same PR as S0-13 / S1-01. The `Clang-tidy gate` step in [.github/workflows/ci.yml](../.github/workflows/ci.yml) now invokes `run-clang-tidy -p build/debug`, reusing debug's `compile_commands.json` rather than reconfiguring and recompiling the project under the `tidy` preset. The `tidy` preset remains in [CMakePresets.json](../CMakePresets.json) for local editor-loop use where inline tidying is handier than a post-hoc sweep.
+
+- [x] **S1-05** — Move `format-check` before the first expensive build for fail-fast
+  - Deps: S0-13
+  - Size: XS
+  - Satisfies: NFR-6 (developer ergonomics), NFR-7 (formatter)
+  - Landed in the same PR as S0-13. `format-check` now runs immediately after `Configure (debug)`, before `Build (debug)` / `Test (debug)`. A formatting violation surfaces in seconds instead of after a full debug build + test pass.
+
+- [ ] **S1-06** — Split CI into parallel jobs (debug / release / tidy fan-out)
+  - Deps: S0-13, S1-01
+  - Size: M
+  - Satisfies: NFR-6 (CI latency)
+  - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) is a single `macos-14` job that runs every step sequentially. The natural fan-out is a `setup` job (checkout + brew + vcpkg bootstrap + cache prime) that three downstream jobs `needs:` — **debug** (format-check + build + test), **release** (configure + build), **tidy** (`run-clang-tidy -p build/debug`, which first needs its own `configure (debug)` to regenerate `compile_commands.json` because the filesystem doesn't persist across GH runners). Each parallel job restores the `vcpkg_installed` cache independently. **Don't pull the trigger yet** — currently the project compiles in under a minute and tidy runs in seconds, so each split would pay its own ~3–5 min setup tax (cache restore of the 3–5 GB tree + brew install + vcpkg clone) that exceeds the concurrent savings. Revisit once sequential `build(debug) + build(release) + run-clang-tidy` wall time crosses ~15 min of actual work. Known sharp edges: the shared `x-gha` binary cache can race on a cold vcpkg.json change (multiple jobs rebuild the same port simultaneously) — if that becomes an issue, the `setup` job primes the binary cache before fan-out.
+
+- [x] **S1-08** — Promote `VCPKG_INSTALLED_DIR` into CMakePresets.json `_base` preset
+  - Deps: S0-04, S1-01
+  - Size: S
+  - Satisfies: NFR-6 (CI latency, local/CI parity, developer ergonomics)
+  - S1-01 landed the `Cache vcpkg_installed tree` step against `build/_vcpkg_installed`, relying on the `VCPKG_INSTALLED_DIR` env var at the job level in [.github/workflows/ci.yml](../.github/workflows/ci.yml) to redirect vcpkg's install tree there. Observation from the first post-S1-01 run ([#24782789092](https://github.com/mroy113/wildframe/actions/runs/24782789092)): vcpkg's CMake toolchain integration reads `VCPKG_INSTALLED_DIR` from the CMake cache, not the process environment, so the env var was silently ignored — ports landed in `build/debug/vcpkg_installed/` and `build/release/vcpkg_installed/` per preset-default, `build/_vcpkg_installed/` was never created, and the post-step warned `Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved`. Fixed by moving `VCPKG_INSTALLED_DIR` into the [CMakePresets.json](../CMakePresets.json) `_base` preset's `cacheVariables` block so every inheriting preset sees the same install tree both in CI and locally; the ci.yml env var was removed and replaced with a comment pointing at the preset. Filed and addressed in the S0-13 + S1-01/04/05 PR. Identified by the 2026-04-22 CI-hardening review §1 / §5.
 
 ---
 

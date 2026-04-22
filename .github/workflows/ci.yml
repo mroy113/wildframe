@@ -1,0 +1,154 @@
+# S0-13: CI gate on macOS. Per CONTRIBUTING.md all of the following must pass
+# before a PR may merge: configure+build in debug and release, ctest, the
+# format-check target (NFR-7), and the clang-tidy gate (NFR-8).
+#
+# Caching strategy (S1-01 reshuffle: three layers, each handling a different
+# kind of change):
+#   - build/_vcpkg_installed/ — the unpacked dep tree. Hot path on every PR
+#     where vcpkg.json is unchanged: `cmake --preset debug` skips the per-port
+#     unpack entirely, dropping steady-state CI from ~3h to ~minutes. Keyed on
+#     vcpkg.json plus the platform-minimums CMake files (the S0-20 gate sets
+#     the deployment target and compiler-version floor the tree's ABI is
+#     bound to — a bump there must invalidate the cache). restore-keys allow
+#     a partial hit when only vcpkg.json changed; vcpkg's next install then
+#     reconciles against the manifest delta using x-gha.
+#   - vcpkg binary cache via the official x-gha backend. Engaged when the
+#     installed-tree key misses: vcpkg pulls per-port archives from x-gha so
+#     only the genuinely new/changed port rebuilds from source.
+#   - Fetched assets (build/_models, build/_fixtures) keyed on the hashes of
+#     the files that pin them. A pin rotation (new SHA256) naturally misses.
+#
+# vcpkg is cloned at vcpkg.json's builtin-baseline so the checkout and the
+# manifest stay in lockstep. When S0-15 lands, the vcpkg commit pin will be
+# promoted to a documented developer-environment decision; until then the
+# manifest's baseline is the single source of truth.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS — build, test, format-check, clang-tidy
+    runs-on: macos-14
+    timeout-minutes: 240
+    env:
+      # Route vcpkg's binary cache through GitHub Actions cache.
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      # The shared install tree at build/_vcpkg_installed is wired in
+      # CMakePresets.json's `_base` preset via the VCPKG_INSTALLED_DIR
+      # cache variable. Setting it here as an env var is not sufficient —
+      # the cmake vcpkg toolchain integration reads it from CMake cache,
+      # not from the process environment, so the env var was silently
+      # ignored in run 24782789092 and the S1-01 cache step saved nothing.
+      # Cache path below must match the preset's value.
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # vcpkg's x-gha backend reads these two env vars to talk to the Actions
+      # cache service. They are present in the runner environment by default
+      # but not inherited by child processes until re-exported.
+      - name: Export GitHub Actions cache env for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install Ninja, LLVM (clang-format, clang-tidy), and vcpkg build prerequisites
+        # autoconf / autoconf-archive / automake / libtool are required by
+        # autotools-based vcpkg ports (e.g. libb2, transitive via exiv2);
+        # the runner's Xcode toolchain does not ship them.
+        run: brew install ninja llvm autoconf autoconf-archive automake libtool
+
+      - name: Bootstrap vcpkg at vcpkg.json builtin-baseline
+        run: |
+          set -euo pipefail
+          BASELINE=$(jq -r '."builtin-baseline"' vcpkg.json)
+          if [ -z "$BASELINE" ] || [ "$BASELINE" = "null" ]; then
+            echo "error: vcpkg.json has no builtin-baseline" >&2
+            exit 1
+          fi
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$HOME/vcpkg"
+          git -C "$HOME/vcpkg" checkout "$BASELINE"
+          "$HOME/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> "$GITHUB_ENV"
+
+      # S1-01: the expensive layer. Key includes cmake/platforms/*.cmake and
+      # PlatformMinimums.cmake because S0-20's deployment-target / compiler
+      # gate is baked into the ABI of everything vcpkg compiles. The "macos14"
+      # segment mirrors `runs-on: macos-14` above and must be bumped in lockstep
+      # with that value — we accept monthly runner-image refreshes within the
+      # macos-14 family (Apple's libc++ ABI is stable enough across Xcode patch
+      # versions) in exchange for avoiding a monthly 3 h cold rebuild.
+      # restore-keys yield a partial match on vcpkg.json changes so vcpkg can
+      # reconcile against the delta instead of rebuilding Qt 6 from scratch.
+      - name: Cache vcpkg_installed tree
+        uses: actions/cache@v4
+        with:
+          path: build/_vcpkg_installed
+          key: vcpkg-installed-macos14-${{ runner.arch }}-${{ hashFiles('vcpkg.json', 'cmake/PlatformMinimums.cmake', 'cmake/platforms/macos.cmake') }}
+          restore-keys: |
+            vcpkg-installed-macos14-${{ runner.arch }}-
+
+      - name: Cache fetched assets (ONNX models + CR3 fixtures)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_models
+            build/_fixtures
+          key: wildframe-assets-${{ hashFiles('tools/fetch_models.cmake', 'tools/fetch_fixtures.cmake') }}
+
+      - name: Configure (debug)
+        run: cmake --preset debug
+
+      # S1-05: format-check only depends on configure (it's a custom target
+      # wrapping `clang-format --dry-run --Werror` over a GLOB'd source list),
+      # so running it here surfaces formatting violations in seconds instead
+      # of after the full debug build + tests.
+      - name: Format check (fail-fast)
+        run: cmake --build --preset debug --target format-check
+
+      - name: Build (debug)
+        run: cmake --build --preset debug
+
+      - name: Test (debug)
+        run: ctest --preset debug
+
+      - name: Configure (release)
+        run: cmake --preset release
+
+      - name: Build (release)
+        run: cmake --build --preset release
+
+      # S1-04: run clang-tidy directly against debug's compile_commands.json
+      # rather than reconfiguring the whole project under the `tidy` preset
+      # (which recompiles every TU with CMAKE_CXX_CLANG_TIDY as a launcher).
+      # The debug configure already wrote compile_commands.json; every TU
+      # has its exact compile command there. WarningsAsErrors='*' in
+      # .clang-tidy makes a finding fail the step. The `tidy` preset stays
+      # in CMakePresets.json for local editor-loop use where inline tidying
+      # is handier than a post-hoc sweep.
+      - name: Clang-tidy gate (zero findings)
+        run: |
+          set -euo pipefail
+          TIDY_DIR="$(brew --prefix llvm)/bin"
+          "$TIDY_DIR/run-clang-tidy" \
+            -p build/debug \
+            -clang-tidy-binary "$TIDY_DIR/clang-tidy" \
+            -quiet
