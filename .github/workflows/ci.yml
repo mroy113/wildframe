@@ -46,12 +46,13 @@ jobs:
     env:
       # Route vcpkg's binary cache through GitHub Actions cache.
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-      # Share a single install tree across all three presets. Without this,
-      # each preset's configure unpacks every port from the binary cache into
-      # its own build/<preset>/vcpkg_installed/, tripling the vcpkg cost per
-      # run (observed ~1 h per preset → ~3 h before the project compiles).
-      # All three presets use the same arm64-osx triplet, so sharing is safe.
-      VCPKG_INSTALLED_DIR: ${{ github.workspace }}/build/_vcpkg_installed
+      # The shared install tree at build/_vcpkg_installed is wired in
+      # CMakePresets.json's `_base` preset via the VCPKG_INSTALLED_DIR
+      # cache variable. Setting it here as an env var is not sufficient —
+      # the cmake vcpkg toolchain integration reads it from CMake cache,
+      # not from the process environment, so the env var was silently
+      # ignored in run 24782789092 and the S1-01 cache step saved nothing.
+      # Cache path below must match the preset's value.
       HOMEBREW_NO_AUTO_UPDATE: "1"
       HOMEBREW_NO_INSTALL_CLEANUP: "1"
 
