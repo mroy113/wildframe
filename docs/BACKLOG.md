@@ -202,6 +202,12 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Satisfies: NFR-6 (developer ergonomics), NFR-7 (formatter)
   - Landed in the same PR as S0-13. `format-check` now runs immediately after `Configure (debug)`, before `Build (debug)` / `Test (debug)`. A formatting violation surfaces in seconds instead of after a full debug build + test pass.
 
+- [ ] **S1-06** — Split CI into parallel jobs (debug / release / tidy fan-out)
+  - Deps: S0-13, S1-01
+  - Size: M
+  - Satisfies: NFR-6 (CI latency)
+  - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) is a single `macos-14` job that runs every step sequentially. The natural fan-out is a `setup` job (checkout + brew + vcpkg bootstrap + cache prime) that three downstream jobs `needs:` — **debug** (format-check + build + test), **release** (configure + build), **tidy** (`run-clang-tidy -p build/debug`, which first needs its own `configure (debug)` to regenerate `compile_commands.json` because the filesystem doesn't persist across GH runners). Each parallel job restores the `vcpkg_installed` cache independently. **Don't pull the trigger yet** — currently the project compiles in under a minute and tidy runs in seconds, so each split would pay its own ~3–5 min setup tax (cache restore of the 3–5 GB tree + brew install + vcpkg clone) that exceeds the concurrent savings. Revisit once sequential `build(debug) + build(release) + run-clang-tidy` wall time crosses ~15 min of actual work. Known sharp edges: the shared `x-gha` binary cache can race on a cold vcpkg.json change (multiple jobs rebuild the same port simultaneously) — if that becomes an issue, the `setup` job primes the binary cache before fan-out.
+
 ---
 
 ## Module 1 — `wildframe_ingest` (FR-1)
