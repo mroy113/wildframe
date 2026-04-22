@@ -162,7 +162,14 @@ jobs:
         run: |
           set -euo pipefail
           TIDY_DIR="$(brew --prefix llvm)/bin"
+          # Homebrew clang-tidy doesn't auto-discover the active Xcode SDK
+          # that /usr/bin/c++ (the compile_commands.json compiler) resolves
+          # implicitly. Without -isysroot, tidy re-parses each TU with no
+          # libc++ path and every stdlib include fails, cascading into
+          # bogus findings across the project.
+          SDK_PATH="$(xcrun --show-sdk-path)"
           "$TIDY_DIR/run-clang-tidy" \
             -p build/debug \
             -clang-tidy-binary "$TIDY_DIR/clang-tidy" \
+            -extra-arg="-isysroot$SDK_PATH" \
             -quiet

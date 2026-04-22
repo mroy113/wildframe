@@ -138,7 +138,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: FR-11
   - `docs/CONFIG.md` documenting every configurable field: name, type, range, default, which FR/NFR it relates to. Ship a fully-commented default `data/config.default.toml`. Specify the resolution order (CLI arg → XDG path → built-in default). Config is startup-only for MVP — no hot-reload.
 
-- [ ] **S0-19** — Output path implementation
+- [x] **S0-19** — Output path implementation
   - Deps: S0-18
   - Size: S
   - Satisfies: FR-5, FR-11
