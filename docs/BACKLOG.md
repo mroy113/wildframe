@@ -148,7 +148,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
     - Both paths are overridable via TOML config keys `log_path` and `manifest_dir`.
   - Implement path-resolution helpers. Record in `docs/CONFIG.md`. Cross-link from `README.md` (see S0-16).
 
-- [ ] **S0-20** — macOS deployment target + toolchain minimums
+- [x] **S0-20** — macOS deployment target + toolchain minimums
   - Deps: S0-01
   - Size: S
   - Satisfies: NFR-6 (reproducibility), §3 (platform)

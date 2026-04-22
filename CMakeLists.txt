@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.24)
 
+# macOS minimum deployment target: 13.0 (Ventura).
+# Per handoff §16.24 and docs/DEV_SETUP.md. Must be set before project()
+# so the compiler and feature-detection probes see it. The empty-value
+# check also covers older caches where the variable is defined but blank.
+if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING
+        "Minimum macOS version Wildframe builds will run on." FORCE)
+endif()
+
 # vcpkg toolchain: pick it up from VCPKG_ROOT if the caller did not pass
 # -DCMAKE_TOOLCHAIN_FILE explicitly. Must happen before project().
 # Presets (S0-04) will wire this explicitly; this hook keeps a bare
@@ -14,6 +23,23 @@ project(wildframe
     DESCRIPTION "Bird photo culling assistant"
     LANGUAGES CXX
 )
+
+# Toolchain minimum: Apple Clang >= 15 (ships with Xcode 15+).
+# Per handoff §16.24 and docs/DEV_SETUP.md.
+if(APPLE)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+        message(FATAL_ERROR
+            "Wildframe requires the Apple Clang toolchain on macOS. "
+            "Detected: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}. "
+            "See docs/DEV_SETUP.md.")
+    endif()
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+        message(FATAL_ERROR
+            "Wildframe requires Apple Clang >= 15 (Xcode 15 or newer). "
+            "Detected: AppleClang ${CMAKE_CXX_COMPILER_VERSION}. "
+            "See docs/DEV_SETUP.md.")
+    endif()
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
