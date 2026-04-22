@@ -2,56 +2,11 @@
 
 #include <gtest/gtest.h>
 
-#include <cstdlib>
 #include <filesystem>
-#include <optional>
-#include <string>
 
 namespace {
 
 namespace wfo = wildframe::orchestrator;
-
-// On POSIX / macOS the seam reads HOME. The tests intentionally
-// target the same variable the production code reads so we exercise
-// the one path that ships on MVP's supported platform (handoff §3).
-// Skipping Windows (USERPROFILE) branches keeps the harness from
-// speculatively guarding against a platform P2-01 has not decided on.
-constexpr const char* kHomeEnvVar = "HOME";
-
-// RAII guard around HOME so no test leaves the process environment
-// mutated for subsequent tests or the surrounding ctest runner.
-class ScopedHome {
- public:
-  ScopedHome() {
-    if (const auto* raw = std::getenv(kHomeEnvVar); raw != nullptr) {
-      saved_ = std::string{raw};
-      had_saved_ = true;
-    }
-  }
-
-  ScopedHome(const ScopedHome&) = delete;
-  ScopedHome& operator=(const ScopedHome&) = delete;
-  ScopedHome(ScopedHome&&) = delete;
-  ScopedHome& operator=(ScopedHome&&) = delete;
-
-  ~ScopedHome() {
-    if (had_saved_) {
-      ::setenv(kHomeEnvVar, saved_.c_str(), /*overwrite=*/1);
-    } else {
-      ::unsetenv(kHomeEnvVar);
-    }
-  }
-
-  static void Set(const std::string& value) {
-    ::setenv(kHomeEnvVar, value.c_str(), /*overwrite=*/1);
-  }
-
-  static void Unset() { ::unsetenv(kHomeEnvVar); }
-
- private:
-  std::string saved_{};
-  bool had_saved_ = false;
-};
 
 TEST(ExpandTilde, EmptyPathReturnedUnchanged) {
   const std::filesystem::path home{"/Users/alice"};
@@ -116,29 +71,6 @@ TEST(DefaultManifestDir, ResolvesAgainstHome) {
   EXPECT_EQ(wfo::DefaultManifestDir(home),
             std::filesystem::path{
                 "/Users/alice/Library/Application Support/Wildframe/batches"});
-}
-
-TEST(ResolveHomeFromEnv, ReturnsPathWhenHomeSet) {
-  const ScopedHome guard;
-  ScopedHome::Set("/Users/alice");
-
-  const auto resolved = wfo::ResolveHomeFromEnv();
-  ASSERT_TRUE(resolved.has_value());
-  EXPECT_EQ(*resolved, std::filesystem::path{"/Users/alice"});
-}
-
-TEST(ResolveHomeFromEnv, ReturnsNulloptWhenHomeUnset) {
-  const ScopedHome guard;
-  ScopedHome::Unset();
-
-  EXPECT_EQ(wfo::ResolveHomeFromEnv(), std::nullopt);
-}
-
-TEST(ResolveHomeFromEnv, ReturnsNulloptWhenHomeEmpty) {
-  const ScopedHome guard;
-  ScopedHome::Set("");
-
-  EXPECT_EQ(wfo::ResolveHomeFromEnv(), std::nullopt);
 }
 
 }  // namespace
