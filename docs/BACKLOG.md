@@ -113,7 +113,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-6 (maintainability)
   - `docs/DEV_SETUP.md` + a `tools/bootstrap.sh` script covering: Xcode command-line tools, Homebrew, CMake ≥3.24, Ninja, vcpkg clone + bootstrap (pinned to a specific commit for reproducibility), first `cmake --preset debug` + build. Must take a clean macOS machine to "first build passing" with one command.
 
-- [ ] **S0-16** — User-facing README.md
+- [x] **S0-16** — User-facing README.md
   - Deps: S0-01
   - Size: S
   - Satisfies: NFR-6
@@ -160,7 +160,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: FR-10
   - **Decided:** default is **prompt-per-batch** with three batch-level options (*skip already-analyzed*, *overwrite all*, *cancel*) and a per-file override available from the detail view. Chosen option recorded in the batch manifest and on each affected sidecar via `wildframe_user:reanalysis_policy_used`. Overridable via TOML config key `reanalysis_default` for headless/automated runs.
 
-- [ ] **S0-22** — `LICENSE` file + `vcpkg.json` license field
+- [x] **S0-22** — `LICENSE` file + `vcpkg.json` license field
   - Deps: S0-08
   - Size: S
   - Satisfies: §15 (risks, licensing posture)
