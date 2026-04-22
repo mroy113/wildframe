@@ -18,13 +18,13 @@
 
 namespace wildframe::orchestrator {
 
-/// Expand a leading `~` in `p` to `home`, per `docs/CONFIG.md` §1.3.
-/// Only bare `~` and `~/<rest>` expand; `~user/<rest>` is returned
-/// unchanged because Wildframe does not resolve other users' home
-/// directories. Non-tilde inputs (absolute, relative, empty) are
-/// returned unchanged.
+/// Expand a leading `~` in `input` to `home`, per `docs/CONFIG.md`
+/// §1.3. Only bare `~` and `~/<rest>` expand; `~user/<rest>` is
+/// returned unchanged because Wildframe does not resolve other
+/// users' home directories. Non-tilde inputs (absolute, relative,
+/// empty) are returned unchanged.
 [[nodiscard]] std::filesystem::path ExpandTilde(
-    const std::filesystem::path& p, const std::filesystem::path& home);
+    const std::filesystem::path& input, const std::filesystem::path& home);
 
 /// Default spdlog daily-rotating file-sink path. Resolves to
 /// `<home>/Library/Logs/Wildframe/wildframe.log` per

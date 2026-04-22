@@ -17,25 +17,25 @@ constexpr const char* kManifestDirRelative =
 
 }  // namespace
 
-std::filesystem::path ExpandTilde(const std::filesystem::path& p,
+std::filesystem::path ExpandTilde(const std::filesystem::path& input,
                                   const std::filesystem::path& home) {
-  const std::string s = p.string();
-  if (!s.starts_with('~')) {
-    return p;
+  const std::string text = input.string();
+  if (!text.starts_with('~')) {
+    return input;
   }
-  if (s.size() == 1) {
+  if (text.size() == 1) {
     return home;
   }
   // Only `~/<rest>` is our contract. `~user/...` stays literal so a
   // user typing someone else's home in their config gets a "path does
   // not exist" later instead of silently resolving to their own home.
-  if (s.starts_with("~/")) {
-    const auto rest = s.substr(2);
+  if (text.starts_with("~/")) {
+    const auto remainder = text.substr(2);
     // `home / ""` appends a separator in libc++, so treat empty tail
     // (`~/`) the same as bare `~`.
-    return rest.empty() ? home : home / rest;
+    return remainder.empty() ? home : home / remainder;
   }
-  return p;
+  return input;
 }
 
 std::filesystem::path DefaultLogPath(const std::filesystem::path& home) {
