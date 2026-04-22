@@ -99,6 +99,15 @@ marginal benefit from an alternative.
   `protected:` members of classes. Plain aggregates (`struct` used as a
   passive data carrier — e.g. `ImageJob`, `DetectionResult`) have no
   invariants to protect and use bare `snake_case`.
+- **Single-letter names are reserved for universal conventions** —
+  loop indices and iterators (`i`, `j`, `it`), coordinate components
+  (`x`, `y`, `z`), template type parameters (`T`, `U`), and the
+  exception caught in `catch (const std::exception& e)`. Everything
+  else spells out its role (`input`, `count`, `remainder`,
+  `home_path`), because the semantic meaning that a single letter
+  discards is exactly what the reader needs to navigate the code.
+  If a descriptive name feels too long, find a better short word —
+  do not shrink to one letter.
 
 ### 2.2 Header ordering
 
@@ -272,6 +281,95 @@ A wrapper that only renames symbols for namespace aesthetics, or
 invariants, is NFR-6 debt. Type aliases (`using level = spdlog::level;`)
 are the honest way to shorten a qualified name without the
 maintenance cost of a real wrapping layer.
+
+### 2.10 `NOLINT` is a last resort
+
+A `NOLINT` / `NOLINTNEXTLINE` / `NOLINTBEGIN` suppression is a
+statement that the checker is wrong about this specific site. It
+requires evidence, not just a rationale.
+
+Before suppressing any clang-tidy finding, try the real fix:
+
+- Catch the exception the checker worries about.
+- Narrow the type so the unchecked operation becomes safe.
+- Restructure the call site (e.g. `s.starts_with('~')` instead of
+  `s[0] == '~'`) so the check no longer applies.
+- Add an invariant (`ASSERT`/`if` guard, dependency injection) that
+  makes the operation provably safe.
+
+Only when the real fix is genuinely non-viable may a `NOLINT` ship,
+and the comment at the suppression site must say **what real fix was
+attempted and why it was rejected**. A comment that merely restates
+the checker's complaint ("getenv is flagged mt-unsafe, but it's
+fine") is a premature suppression — the real fix was not tried.
+
+Scoping rules:
+
+- Always prefer `NOLINTNEXTLINE` (or a tight `NOLINTBEGIN`/`END` pair)
+  over file-wide `// NOLINT(check)` banners. The suppression must be
+  scoped to the exact line(s) the fix-attempt could not cover.
+- Name the specific check (`NOLINTNEXTLINE(concurrency-mt-unsafe)`).
+  Bare `NOLINT` / `NOLINT(*)` is banned — it silences checks the
+  suppression author never considered.
+
+### 2.11 Do not ship speculative interface surface
+
+A task's public interface covers exactly the callers that exist
+inside the task's own scope. Exported functions, headers, config
+keys, and error types that are "prepared" for a caller that will
+land in a future task are NFR-6 debt: they must be understood,
+formatted, tidied, and kept in sync forever, for zero present
+value, and by the time the future caller arrives its actual shape
+almost always diverges from the prepared one.
+
+Concretely:
+
+- If the only reference to a new public function lives inside the
+  same module's own tests, the function is speculative — delete it
+  and let the task that introduces the real caller introduce the
+  seam in the shape it actually needs.
+- If a config key is defined but no code reads it in this task,
+  defer the key. `docs/CONFIG.md` can describe the intended default,
+  but the parser wiring lands with the first consumer.
+- Internal helpers used by the same `.cpp` file are fine — they are
+  not interface surface. This rule is about things that cross a
+  module boundary or a public header.
+
+Exception: load-bearing invariants that the task's own code depends
+on, even if only at one call site today, are not speculative. The
+line between "one caller today" (fine) and "zero callers today"
+(debt) is the test.
+
+### 2.12 Environment and global state reads
+
+Process-wide state — environment variables, current working
+directory, wall-clock time, locale, per-process singletons —
+enters the program at exactly one known boundary per kind of state,
+and is threaded downward as a parameter from there. Business logic
+never calls `std::getenv`, `std::filesystem::current_path`, or
+`std::chrono::system_clock::now` from the middle of a function.
+
+This is a testability rule, not a style affectation: functions that
+take resolved values as parameters are unit-testable with injected
+data and need no `setenv` / `chdir` / clock-mocking in their test
+harness. A test that mutates the process environment is a smell —
+it is global state shared with every other test in the same
+executable and with `ctest` itself, and it means the function under
+test took on a dependency that should have been a parameter.
+
+Concretely:
+
+- The thin seam that reads `$HOME`, `$XDG_CONFIG_HOME`, etc. lives
+  in the startup wiring (main, or the orchestrator's one-shot
+  config resolver). Every other function takes a resolved
+  `std::filesystem::path` or equivalent.
+- If you find yourself wanting to mock `std::getenv` in a test,
+  stop and refactor the code instead: the function should have
+  taken the value as a parameter.
+- The same applies to wall-clock time and working directory.
+  Manifest writers, log-file rotators, and anything else that
+  cares about "now" or "where" takes an injected clock or path and
+  lets the integration point supply the process-level value.
 
 ---
 
