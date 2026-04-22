@@ -2,13 +2,21 @@
 # before a PR may merge: configure+build in debug and release, ctest, the
 # format-check target (NFR-7), and the clang-tidy gate (NFR-8).
 #
-# Caching strategy:
-#   - vcpkg binary cache via the official x-gha backend. Avoids rebuilding
-#     Qt 6 / OpenCV / onnxruntime / etc. on every run. The first run is slow
-#     (full source build of all deps); subsequent runs restore from cache.
-#   - Fetched assets (build/_models, build/_fixtures) cached by the hashes of
-#     the files that pin them. Any change to tools/fetch_*.cmake invalidates
-#     the cache and the next run re-downloads.
+# Caching strategy (S1-01 reshuffle: three layers, each handling a different
+# kind of change):
+#   - build/_vcpkg_installed/ — the unpacked dep tree. Hot path on every PR
+#     where vcpkg.json is unchanged: `cmake --preset debug` skips the per-port
+#     unpack entirely, dropping steady-state CI from ~3h to ~minutes. Keyed on
+#     vcpkg.json plus the platform-minimums CMake files (the S0-20 gate sets
+#     the deployment target and compiler-version floor the tree's ABI is
+#     bound to — a bump there must invalidate the cache). restore-keys allow
+#     a partial hit when only vcpkg.json changed; vcpkg's next install then
+#     reconciles against the manifest delta using x-gha.
+#   - vcpkg binary cache via the official x-gha backend. Engaged when the
+#     installed-tree key misses: vcpkg pulls per-port archives from x-gha so
+#     only the genuinely new/changed port rebuilds from source.
+#   - Fetched assets (build/_models, build/_fixtures) keyed on the hashes of
+#     the files that pin them. A pin rotation (new SHA256) naturally misses.
 #
 # vcpkg is cloned at vcpkg.json's builtin-baseline so the checkout and the
 # manifest stay in lockstep. When S0-15 lands, the vcpkg commit pin will be
@@ -79,6 +87,23 @@ jobs:
           git -C "$HOME/vcpkg" checkout "$BASELINE"
           "$HOME/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
           echo "VCPKG_ROOT=$HOME/vcpkg" >> "$GITHUB_ENV"
+
+      # S1-01: the expensive layer. Key includes cmake/platforms/*.cmake and
+      # PlatformMinimums.cmake because S0-20's deployment-target / compiler
+      # gate is baked into the ABI of everything vcpkg compiles. The "macos14"
+      # segment mirrors `runs-on: macos-14` above and must be bumped in lockstep
+      # with that value — we accept monthly runner-image refreshes within the
+      # macos-14 family (Apple's libc++ ABI is stable enough across Xcode patch
+      # versions) in exchange for avoiding a monthly 3 h cold rebuild.
+      # restore-keys yield a partial match on vcpkg.json changes so vcpkg can
+      # reconcile against the delta instead of rebuilding Qt 6 from scratch.
+      - name: Cache vcpkg_installed tree
+        uses: actions/cache@v4
+        with:
+          path: build/_vcpkg_installed
+          key: vcpkg-installed-macos14-${{ runner.arch }}-${{ hashFiles('vcpkg.json', 'cmake/PlatformMinimums.cmake', 'cmake/platforms/macos.cmake') }}
+          restore-keys: |
+            vcpkg-installed-macos14-${{ runner.arch }}-
 
       - name: Cache fetched assets (ONNX models + CR3 fixtures)
         uses: actions/cache@v4

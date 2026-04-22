@@ -172,11 +172,11 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
 
 Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives here to stay visible and get picked up once module work begins to feel the friction.
 
-- [ ] **S1-01** — Cache `build/_vcpkg_installed/` directly in CI
+- [x] **S1-01** — Cache `build/_vcpkg_installed/` directly in CI
   - Deps: S0-13
   - Size: S
   - Satisfies: NFR-6 (developer ergonomics — CI latency drives review cadence)
-  - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) relies on vcpkg's `x-gha` binary cache plus a shared `VCPKG_INSTALLED_DIR`. That still pays a per-run unpack cost (~15–20 min steady state, dominated by Qt 6) because the install tree itself is not cached across runs. Add an `actions/cache` step keyed on `hashFiles('vcpkg.json')` + runner OS/arch that caches the unpacked tree; on hit the first configure becomes near-instant. Trade-off: the tree is ~3–5 GB and eats into the 10 GB per-repo Actions cache quota, so the `x-gha` binary archives get less room. Pull the trigger when steady-state CI wall time crosses ~45 min or becomes recurring review friction — leave the binary cache doing its job until then.
+  - Landed in the same PR as S0-13 after the first green run clocked in at ~3 h wall time — well past the "~45 min friction" trigger. See [.github/workflows/ci.yml](../.github/workflows/ci.yml): the `Cache vcpkg_installed tree` step keys on `vcpkg.json` plus the S0-20 platform-minimums CMake files, with `restore-keys` allowing a partial hit when only `vcpkg.json` changes so vcpkg reconciles the delta via `x-gha` instead of rebuilding Qt 6 from scratch.
 
 - [ ] **S1-02** — CI job: AddressSanitizer + UndefinedBehaviorSanitizer
   - Deps: S0-13, M1-05 (needs at least one real test suite to exercise — otherwise the job passes trivially)
@@ -189,6 +189,18 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Size: S
   - Satisfies: NFR-6, handoff §5 threading strategy
   - Wildframe's runtime has exactly two application-owned threads per [docs/ARCHITECTURE.md §5](ARCHITECTURE.md#5-threading-model): Qt main + one orchestrator worker, with a job queue and cancel flag across them. That is precisely the surface TSan exists to cover. Add a `tsan` preset (`-fsanitize=thread -fno-omit-frame-pointer`) and a CI job that runs the orchestrator's integration tests (M6-07) under it. **Do not start before M6-03** — without a real worker thread the job is a no-op. Known constraints: TSan is incompatible with ASan (separate job), and Qt's own instrumentation may surface benign warnings — triage into a small per-test suppression list rather than globally disabling checks.
+
+- [ ] **S1-04** — Run clang-tidy from debug's `compile_commands.json` instead of a dedicated preset
+  - Deps: S0-13, S1-01
+  - Size: S
+  - Satisfies: NFR-6 (CI latency), NFR-8 (static-analysis gate)
+  - Today the `tidy` preset in [CMakePresets.json](../CMakePresets.json) inherits `debug` and layers `CMAKE_CXX_CLANG_TIDY=clang-tidy` across every TU. That forces a full second project compile — the debug build has already produced objects for the identical TUs in the identical configuration, so the work duplicates. With S1-01 collapsing the per-preset configure cost, the redundant compile becomes the next-longest step as the module tree grows. Replace the preset-based flow with `run-clang-tidy` (or `clang-tidy -p build/debug`) invoked against debug's existing `compile_commands.json`, keeping the same `.clang-tidy` suppression set (S0-06). Keep the `tidy` preset in `CMakePresets.json` for local use where `CMAKE_CXX_CLANG_TIDY` inline gives a tighter edit-loop.
+
+- [ ] **S1-05** — Move `format-check` before the first expensive build for fail-fast
+  - Deps: S0-13
+  - Size: XS
+  - Satisfies: NFR-6 (developer ergonomics), NFR-7 (formatter)
+  - [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs `format-check` after `Build (debug)` and `Test (debug)`, so a formatting violation burns both of those steps before reporting. The target only depends on configure (it invokes `clang-format --dry-run` over the sources discovered at configure time), so moving it to immediately after `Configure (debug)` surfaces violations in under a minute. Near-zero code churn; the win is small in absolute time but the cadence penalty on "forgot to run format" PRs drops from minutes to seconds.
 
 ---
 
