@@ -3,7 +3,7 @@
   "name": "wildframe",
   "version-string": "0.0.0",
   "description": "Bird photo culling assistant. Detects birds in CR3 RAW files, scores focus/keeper quality, and writes XMP sidecar metadata.",
-  "license": null,
+  "license": "GPL-3.0-or-later",
   "supports": "osx",
   "builtin-baseline": "c3867e714dd3a51c272826eea77267876517ed99",
   "dependencies": [
