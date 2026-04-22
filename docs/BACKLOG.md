@@ -101,7 +101,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-7, NFR-8
   - Jobs: configure + build (debug and release), run `ctest`, run format-check, run clang-tidy gate. All required to pass before merge. Cache vcpkg and `build/_models/`.
 
-- [ ] **S0-14** — spdlog global logger initialization
+- [x] **S0-14** — spdlog global logger initialization
   - Deps: S0-02, S0-03, S0-17
   - Size: S
   - Satisfies: NFR-5 (auditability)

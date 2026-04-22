@@ -48,7 +48,19 @@ include("${CMAKE_SOURCE_DIR}/tools/fetch_models.cmake")
 # Configure-time fetch of pinned CR3 test fixtures (S0-12).
 include("${CMAKE_SOURCE_DIR}/tools/fetch_fixtures.cmake")
 
-# Internal static-library modules (see handoff doc §10).
+# enable_testing() must precede any add_subdirectory() that registers
+# tests via add_test() / gtest_discover_tests(). BUILD_TESTING defaults
+# to ON; building with -DBUILD_TESTING=OFF skips the test executables
+# (e.g. for a release packaging configure that does not need them).
+include(CTest)
+if(BUILD_TESTING)
+    find_package(GTest CONFIG REQUIRED)
+endif()
+
+# Internal static-library modules (see handoff doc §10). wildframe_log
+# is listed first because the policy in docs/STYLE.md §4 has every
+# other module call into it for log emission once they grow real code.
+add_subdirectory(libs/log)
 add_subdirectory(libs/ingest)
 add_subdirectory(libs/raw)
 add_subdirectory(libs/detect)
