@@ -64,7 +64,7 @@ A task is not done until **all** of these hold:
 
 1. Code compiles in both `debug` and `release` presets.
 2. `ctest --preset debug` passes, including new tests for any new code.
-3. `cmake --build --preset tidy` produces **zero clang-tidy findings**. No new `NOLINT` suppressions without a justification comment citing either a confirmed false positive or a considered alternative.
+3. `cmake --build --preset tidy` produces **zero clang-tidy findings**. No new `NOLINT` suppressions without a justification comment that cites either (a) a confirmed false positive with evidence, or (b) an alternative fix that was *attempted and rejected*, with the reason. A NOLINT whose comment only describes the checker's complaint without documenting a tried-and-rejected real fix is a premature suppression; try the real fix first (catch the exception, narrow the type, fix the include hygiene) and only suppress when that path genuinely fails.
 4. `format-check` passes.
 5. Public headers have brief Doxygen comments on their public interfaces.
 6. The task's PR description cites the FR-x and/or NFR-x it satisfies, from `bird_photo_ai_project_handoff.md`.
@@ -83,6 +83,7 @@ A task is not done until **all** of these hold:
 - **Do not introduce new dependencies** without adding them to `vcpkg.json` and updating `docs/LICENSING.md`. Net-new dependencies require user approval.
 - **Do not exceed module responsibilities.** If a task in module X requires a change in module Y, open a separate task for Y rather than quietly editing across boundaries.
 - **Prefer readability over cleverness.** See NFR-6. If you're reaching for SFINAE, CRTP, or heavy templates, stop and consider a concrete alternative first.
+- **Verify the library's idiomatic usage before designing.** For any non-trivial interaction with a third-party dependency (logging, HTTP, ORM, serialization, parsing, image I/O), read the library's own FAQ, README, or reference examples for its recommended pattern *before* sketching a Wildframe API layer over it. Do this as part of §7's judgment gate, not as a reaction to review feedback. The prior draft of `wildframe_log` invented a `WILDFRAME_LOG_*` macro fan-out instead of spelling the spdlog-blessed `logger->info(...)` call — an hour of spdlog-docs reading would have preempted a full redesign.
 - **Third-party exceptions do not cross module boundaries.** Catch Exiv2/LibRaw/ONNX Runtime/Qt exceptions at the module's public API and translate to Wildframe error types (see NFR-7 exception policy).
 
 ---
