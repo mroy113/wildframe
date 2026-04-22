@@ -582,6 +582,22 @@ Tasks here are **not** part of MVP and must not be picked up until `I-05` is sig
     - Concrete follow-up tasks (populate `cmake/platforms/linux.cmake` and `cmake/platforms/windows.cmake` per S0-20, revisit `cmake/ClangTooling.cmake` Homebrew-isms, CI jobs, triplet selection) with sizing so they can land in a sprint.
   - **Agent directive: do not start before I-05 is signed off.** This is a scoping task, not implementation; picking it up early is the exact scope creep CLAUDE.md §5 forbids.
 
+- [ ] **P3-01** — Scope hosted-inference SaaS commercialization path
+  - Deps: Phase 2 species-ID module shipped and in customer hands; not tracked yet.
+  - Size: M (planning, not implementation)
+  - Satisfies: n/a to the current handoff — this task proposes a handoff amendment, because nothing in `bird_photo_ai_project_handoff.md` currently scopes commercialization or network I/O.
+  - Context: once species ID is in users' hands, the natural next lever is running detection / species ID / future components on Wildframe-hosted infrastructure, sold as metered API credits. The swap is feasible because module boundaries already isolate inference behind neutral interfaces (`wildframe_detect`, `wildframe_focus`, Phase 2 species-ID). This task decides whether to pursue it and what the shape is; no code lands under this ID.
+  - Deliverable: a decision record (plan-change PR per CONTRIBUTING.md, since this materially changes the handoff's scope boundaries in §4 and §6) covering:
+    - Whether to offer a paid subscription where inference components run on hosted infrastructure and clients purchase API credits.
+    - **Substitutability audit of current interfaces.** Confirm `wildframe_detect` (M3), `wildframe_focus` (M4), and the Phase 2 species-ID module expose types that traffic in neutral data (image buffers in, result structs out) and do not leak ONNX Runtime, OpenCV, or LibRaw symbols across their public API. If they do, file remediation tasks **before** any wire protocol is designed; retrofitting an abstraction under a shipped interface is painful.
+    - **Distribution shape.** Desktop + remote inference vs. Lightroom plugin (currently out of MVP per handoff §6) vs. web-based batch uploader. Once server-side inference is the value prop, the Lightroom-plugin branch becomes a much stronger distribution story — revisit §6 deliberately rather than by default.
+    - **What stays local vs. what goes over the wire.** RAW decode and XMP sidecar write must remain client-side (bandwidth, user file ownership, offline safety). Uploads should be decoded previews or crops, not CR3s.
+    - **Wire protocol.** Versioned from day one. Authentication (OIDC + QKeychain or platform equivalent), token refresh, what happens when the server rev breaks the client contract, graceful degradation to offline mode if credits exhausted mid-batch.
+    - **Commercial surface area.** Account management, metered billing, credit-exhausted-mid-batch UX, auto-update infrastructure (Sparkle / Qt Installer Framework), telemetry posture consistent with NFR-5, cross-platform pressure this creates (Windows becomes a revenue question, not a nice-to-have — see P2-01).
+    - **IP and licensing impact.** Subcontracted closed-source models, terms of service, data-retention commitments, and the interaction with the GPL-3.0-or-later client license recorded in `docs/LICENSING.md §1.1`. Server components and network-service obligations likely need separate licensing analysis (AGPL vs. GPL vs. proprietary server) — not a decision to make under this ID, but one to surface.
+    - Concrete follow-up tasks with sizing so the implementation work can land in subsequent sprints.
+  - **Agent directive: do not start before Phase 2 species-ID is shipped to users AND the customer explicitly signals readiness by ID.** This is a scoping task, not implementation; picking it up early is the exact scope creep CLAUDE.md §5 forbids. Any implementation work arising from this decision record must land under new task IDs after the plan-change PR merges.
+
 ---
 
 ## Conventions for adding tasks
