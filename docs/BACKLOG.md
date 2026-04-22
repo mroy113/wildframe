@@ -178,6 +178,18 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Satisfies: NFR-6 (developer ergonomics — CI latency drives review cadence)
   - Today [.github/workflows/ci.yml](../.github/workflows/ci.yml) relies on vcpkg's `x-gha` binary cache plus a shared `VCPKG_INSTALLED_DIR`. That still pays a per-run unpack cost (~15–20 min steady state, dominated by Qt 6) because the install tree itself is not cached across runs. Add an `actions/cache` step keyed on `hashFiles('vcpkg.json')` + runner OS/arch that caches the unpacked tree; on hit the first configure becomes near-instant. Trade-off: the tree is ~3–5 GB and eats into the 10 GB per-repo Actions cache quota, so the `x-gha` binary archives get less room. Pull the trigger when steady-state CI wall time crosses ~45 min or becomes recurring review friction — leave the binary cache doing its job until then.
 
+- [ ] **S1-02** — CI job: AddressSanitizer + UndefinedBehaviorSanitizer
+  - Deps: S0-13, M1-05 (needs at least one real test suite to exercise — otherwise the job passes trivially)
+  - Size: S
+  - Satisfies: NFR-6 (dynamic memory-safety coverage complementing the clang-tidy static gate)
+  - The `asan` preset in [CMakePresets.json](../CMakePresets.json) is "Local use; not wired into CI by S0-04" — dynamic-analysis coverage in CI is currently zero. Add a sibling preset `asan-ubsan` (or extend `asan`) that passes `-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer` and a matching workflow job that runs `ctest --preset asan-ubsan`. Treat any sanitizer error as a failing check. Runtime overhead is ~2× for ASan and negligible for UBSan; expect the job to roughly double the project-build+test portion of CI (not the vcpkg portion, which is shared). Scope excludes LeakSanitizer until we have enough lifetime-managed state to make it actionable (keep the `LSAN_OPTIONS=detect_leaks=0` escape hatch if the tool defaults it on).
+
+- [ ] **S1-03** — CI job: ThreadSanitizer
+  - Deps: M6-03 (no application threads exist before the orchestrator's worker)
+  - Size: S
+  - Satisfies: NFR-6, handoff §5 threading strategy
+  - Wildframe's runtime has exactly two application-owned threads per [docs/ARCHITECTURE.md §5](ARCHITECTURE.md#5-threading-model): Qt main + one orchestrator worker, with a job queue and cancel flag across them. That is precisely the surface TSan exists to cover. Add a `tsan` preset (`-fsanitize=thread -fno-omit-frame-pointer`) and a CI job that runs the orchestrator's integration tests (M6-07) under it. **Do not start before M6-03** — without a real worker thread the job is a no-op. Known constraints: TSan is incompatible with ASan (separate job), and Qt's own instrumentation may surface benign warnings — triage into a small per-test suppression list rather than globally disabling checks.
+
 ---
 
 ## Module 1 — `wildframe_ingest` (FR-1)
