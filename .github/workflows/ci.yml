@@ -138,6 +138,29 @@ jobs:
       - name: Test (debug)
         run: ctest --preset debug
 
+      # S1-02: ASan + UBSan gate. Runs after the debug test pass so formatting
+      # and basic correctness fail-fast before we pay the sanitizer build. Any
+      # sanitizer finding aborts the process (ASan by default, UBSan via
+      # `-fno-sanitize-recover=undefined` in the preset), which fails ctest.
+      - name: Configure (asan+ubsan)
+        run: cmake --preset asan
+
+      - name: Build (asan+ubsan)
+        run: cmake --build --preset asan
+
+      - name: Test (asan+ubsan)
+        env:
+          # LSan is not implemented in Apple Clang's ASan runtime, so leak
+          # detection here is a no-op on the macos-14 runner today. We leave
+          # `detect_leaks` at its default (1) rather than forcing it off, so
+          # the day a Linux job lands (P2-01 cross-platform) leak detection
+          # engages automatically. If that first Linux run reports false
+          # positives from GTest globals / spdlog's logger registry, add a
+          # targeted suppressions file via `LSAN_OPTIONS=suppressions=...`
+          # rather than disabling the check outright.
+          UBSAN_OPTIONS: "print_stacktrace=1"
+        run: ctest --preset asan
+
       # Release configure+build run only on push: main (post-merge validation).
       # PRs don't need release correctness signal — debug catches the same
       # compile/link errors; release is a packaging concern. Skipping it on PR

@@ -9,7 +9,7 @@
         {
             "name": "_base",
             "hidden": true,
-            "description": "Shared base: Ninja generator, vcpkg toolchain, exported compile_commands.json, and a single vcpkg install tree at build/_vcpkg_installed shared across every preset that inherits this one. Sharing is safe only while every inheriting preset uses the same triplet (arm64-osx today) with no ABI-affecting flags; a sanitizer preset (e.g. S1-02 asan-ubsan, S1-03 tsan) must either give itself its own _vcpkg_installed_<variant> path or confirm its ABI matches what's already in the shared tree.",
+            "description": "Shared base: Ninja generator, vcpkg toolchain, exported compile_commands.json, and a single vcpkg install tree at build/_vcpkg_installed shared across every preset that inherits this one. Sharing is safe only while every inheriting preset uses the same triplet (arm64-osx today) with no ABI-affecting flags. The asan preset (S1-02) shares this tree because ASan and UBSan are ABI-compatible with non-instrumented static libraries; a future tsan preset (S1-03) must give itself its own _vcpkg_installed_<variant> path because TSan does require every translation unit to be instrumented.",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
@@ -47,12 +47,12 @@
         },
         {
             "name": "asan",
-            "displayName": "AddressSanitizer",
-            "description": "Debug build with AddressSanitizer. Local use; not wired into CI by S0-04.",
+            "displayName": "AddressSanitizer + UndefinedBehaviorSanitizer",
+            "description": "Debug build with ASan + UBSan. Wired into CI by S1-02. `-fno-sanitize-recover=undefined` turns every UBSan finding into an abort so the CI step fails; ASan already aborts by default. Inherits the _base vcpkg install tree — see that preset's description for the ABI-compatibility note.",
             "inherits": "debug",
             "cacheVariables": {
-                "CMAKE_CXX_FLAGS": "-fsanitize=address -fno-omit-frame-pointer",
-                "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address"
+                "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
             }
         }
     ],
