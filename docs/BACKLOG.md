@@ -107,7 +107,7 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: NFR-5 (auditability)
   - Define a `wildframe_log` library or inline header in `wildframe_orchestrator` providing a configured spdlog sink (stdout + rotating file). Log format includes timestamp, level, and module tag. Level thresholds and destinations per S0-17.
 
-- [ ] **S0-15** — Developer environment bootstrap
+- [x] **S0-15** — Developer environment bootstrap
   - Deps: S0-01, S0-02
   - Size: M
   - Satisfies: NFR-6 (maintainability)
