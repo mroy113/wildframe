@@ -41,7 +41,43 @@
       "Bash(cut *)",
       "Bash(tr *)",
       "Bash(awk *)",
-      "Bash(sed *)"
+      "Bash(sed *)",
+
+      "Bash(echo *)",
+      "Bash(echo)",
+      "Bash(printf *)",
+      "Bash(ls *)",
+      "Bash(ls)",
+      "Bash(find *)",
+      "Bash(file *)",
+      "Bash(stat *)",
+      "Bash(which *)",
+      "Bash(command *)",
+      "Bash(mkdir *)",
+      "Bash(diff *)",
+      "Bash(xargs *)",
+      "Bash(python3 *)",
+      "Bash(python3)",
+
+      "Bash(for *)",
+      "Bash(do *)",
+      "Bash(done)",
+      "Bash(done *)",
+      "Bash(if *)",
+      "Bash(then *)",
+      "Bash(else)",
+      "Bash(else *)",
+      "Bash(elif *)",
+      "Bash(fi)",
+      "Bash(fi *)",
+      "Bash(while *)",
+      "Bash(case *)",
+      "Bash(esac)",
+
+      "Bash(git *)",
+      "Bash(git)",
+      "Bash(gh *)",
+      "Bash(gh)"
     ]
   }
 }
