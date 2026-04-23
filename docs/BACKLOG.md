@@ -283,7 +283,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - **Not in scope for this task.** No job queue, no worker thread, no cancellation — those are M6-02 / M6-03 / M6-08. No `reanalysis_default` handling yet — M7-10 consumes it; TB-01 only validates the value.
   - CLI persists alongside the GUI once Module 7 lands. It is the headless / automation entry point already scoped by FR-10 and FR-11.
 
-- [ ] **TB-02** — Orchestrator skeleton (sequential)
+- [x] **TB-02** — Orchestrator skeleton (sequential)
   - Deps: TB-01, M1-01
   - Size: M
   - Satisfies: NFR-3 (stage-registration extension point), §12 (data flow)
@@ -615,7 +615,7 @@ Thickening pass — **extends** the **TB-07** provenance-only writer with the `w
 
 Thickening pass — **extends** the **TB-02** sequential skeleton with the job queue (M6-02), the worker thread + full sequential pipeline execution (M6-03), per-image error isolation (M6-04), the full batch manifest (M6-05 extends TB-08), the progress callback (M6-06), and cooperative cancellation (M6-08). M6-01's `PipelineStage` interface publishes in TB-02. Each task lands without regressing TB-09.
 
-- [ ] **M6-01** — `PipelineStage` interface for extensibility
+- [x] **M6-01** — `PipelineStage` interface for extensibility
   - Deps: S0-03
   - Size: M
   - Satisfies: NFR-3

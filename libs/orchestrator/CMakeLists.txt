@@ -9,6 +9,17 @@ target_include_directories(wildframe_orchestrator
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
+# `wildframe::ingest` is PUBLIC because `ImageJob` appears in
+# `orchestrator.hpp` / `pipeline_stage.hpp` — every consumer of those
+# headers needs the ingest include path.
+# `wildframe::log` is PRIVATE — no public header re-exports spdlog.
+target_link_libraries(wildframe_orchestrator
+    PUBLIC
+        wildframe::ingest
+    PRIVATE
+        wildframe::log
+)
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()

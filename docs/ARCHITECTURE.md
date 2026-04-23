@@ -294,7 +294,7 @@ to the orchestrator core**. The MVP provides that interface via
 
 ### 4.1 Contract
 
-`PipelineStage` is an abstract base with one polymorphic method:
+`PipelineStage` is an abstract base with two polymorphic methods:
 
 ```cpp
 namespace wildframe::orchestrator {
@@ -307,22 +307,33 @@ class PipelineStage {
 public:
     virtual ~PipelineStage() = default;
 
-    /// Processes one job. On success, returns a StageResult carrying
-    /// outputs the downstream stages may consume. On expected,
-    /// per-image failure (e.g. malformed preview), throws the
-    /// owning module's Wildframe error type — never a third-party
+    /// Short, stable name used for per-stage log lines and (once
+    /// TB-08 lands) as the manifest `stage_timings_ms` key.
+    [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
+
+    /// Runs one stage against `ctx`. Stages read upstream fields
+    /// from the mutable context and write their own output back for
+    /// downstream stages to consume. On expected, per-image failure
+    /// (malformed preview, etc.), the stage throws its owning
+    /// module's Wildframe error type — never a third-party
     /// exception, per docs/STYLE.md §3.
-    virtual StageResult process(const Job& job) = 0;
+    virtual StageResult Process(StageContext& ctx) = 0;
 };
 
 }  // namespace wildframe::orchestrator
 ```
 
-The MVP ships three concrete implementations — `DetectStage`,
-`FocusStage`, `MetadataWriteStage` — each delegating to its
-respective module's public API. `ingest`, `raw`, and EXIF-read are
-orchestrated outside the stage list because they are prerequisites
-the stage list consumes (see §3.2).
+`StageContext` carries the current `ImageJob` plus, as subsequent
+TB-* tasks land, one `std::optional<...>` per stage's output
+(preview buffer, EXIF, detection, focus). `StageResult` is the
+per-stage return channel — empty in the Sprint 2 skeleton, reserved
+for per-stage diagnostics M6-05 will need.
+
+The MVP ships five concrete implementations — `RawStage`,
+`MetadataReadStage`, `DetectStage`, `FocusStage`,
+`MetadataWriteStage` — each delegating to its owning module's
+public API. `ingest` is orchestrated outside the stage list
+(`Enumerate` runs once per batch, not once per image).
 
 ### 4.2 Registration
 
