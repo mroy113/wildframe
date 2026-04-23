@@ -446,7 +446,7 @@ Thickening pass — replaces the **TB-03** stub. Each task below lands without r
 
 Thickening pass — replaces the **TB-06** stub (M5-02..M5-04). M5-01 lands before TB-06 so the stub can return the real struct type.
 
-- [ ] **M5-01** — `DeterministicMetadata` struct
+- [x] **M5-01** — `DeterministicMetadata` struct
   - Deps: S0-03
   - Size: S
   - **Lands in Sprint 2** — TB-06's stub EXIF reader returns a `DeterministicMetadata` instance, so the struct must exist first.

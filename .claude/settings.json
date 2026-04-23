@@ -16,8 +16,13 @@
       "Bash(VCPKG_ROOT=* PATH=* cmake --preset *)",
       "Bash(VCPKG_ROOT=* PATH=* cmake --build --preset *)",
       "Bash(VCPKG_ROOT=* PATH=* ctest --preset *)",
-      "Bash(/usr/local/opt/llvm/bin/run-clang-tidy *)",
-      "Bash(/usr/local/opt/llvm/bin/clang-format *)"
+      "Bash(cmake:*)",
+      "Bash(ctest:*)",
+      "Bash(/usr/local/opt/llvm/bin/run-clang-tidy:*)",
+      "Bash(/usr/local/opt/llvm/bin/clang-format:*)",
+      "Bash(/usr/local/opt/llvm/bin/clang-tidy:*)",
+      "Bash(SDK_PATH=* /usr/local/opt/llvm/bin/run-clang-tidy:*)",
+      "Bash(xcrun --show-sdk-path)"
     ]
   }
 }
