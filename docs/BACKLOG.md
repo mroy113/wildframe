@@ -383,28 +383,28 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Size: S
   - Public header: `libs/ingest/include/wildframe/ingest/image_job.hpp`. Fields: absolute path, format tag (enum, `Cr3` only in MVP), file size, content hash (optional, deferred). Value type, copyable, immutable.
 
-- [ ] **M1-02** — Directory enumeration with CR3 filter
+- [x] **M1-02** — Directory enumeration with CR3 filter
   - Deps: M1-01
   - Size: M
   - Satisfies: FR-1
   - **Lands in Sprint 2** — `wildframe_ingest` ships real in the tracer-bullet slice; TB-09 consumes this output directly.
   - `std::vector<ImageJob> Enumerate(const std::filesystem::path& dir, int max_depth = 1)`. Skips symlinks by default. Returns sorted by path for determinism. Consumes the `[ingest].max_depth` TOML key — widens TB-01's parser with that key in the same PR.
 
-- [ ] **M1-03** — CR3 file validation
+- [x] **M1-03** — CR3 file validation
   - Deps: M1-02
   - Size: S
   - Satisfies: FR-1
   - **Lands in Sprint 2** — TB-09 requires the fixture tree's CR3s to validate and non-CR3s to be skipped.
   - Validate by extension + magic bytes. Malformed files are logged and skipped, not aborted.
 
-- [ ] **M1-04** — Error translation at boundary
+- [x] **M1-04** — Error translation at boundary
   - Deps: M1-02
   - Size: S
   - Satisfies: NFR-7 (exception policy)
   - **Lands in Sprint 2** — TB-09 expects the CLI not to crash on a bad fixture path; the orchestrator catches `IngestError` at the module boundary per STYLE §3.1.
   - Filesystem exceptions caught, translated to `wildframe::ingest::IngestError`.
 
-- [ ] **M1-05** — Unit tests for ingest
+- [x] **M1-05** — Unit tests for ingest
   - Deps: M1-03, M1-04, S0-12
   - Size: M
   - Satisfies: NFR-6 (coverage)
