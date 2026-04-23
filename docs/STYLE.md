@@ -373,39 +373,53 @@ Concretely:
 
 ### 2.13 GoogleTest ↔ clang-tidy interactions
 
-Three clang-tidy checks do not model gtest-specific idioms and will
-trip on otherwise-correct test code. Each has a standard restructure
-per §2.10 "Restructure the call site"; no `NOLINT` is needed.
+A few clang-tidy checks do not model gtest-specific idioms. Rather
+than contort every test file to satisfy checks that were never aimed
+at test code, we disable the worst offenders on test executables
+only. Production code under `libs/<module>/src/` and
+`libs/<module>/include/` still runs the full check set.
 
-- **`bugprone-unchecked-optional-access` does not follow `ASSERT_TRUE`.**
+**Mechanism.** A single cmake helper holds the tests-only disable
+list: `wildframe_apply_tests_tidy_config(<target>)` in
+[cmake/ClangTooling.cmake](../cmake/ClangTooling.cmake). Every test
+`CMakeLists.txt` calls it once, right after `add_executable`. The
+helper overrides the target's `CXX_CLANG_TIDY` to add
+`--checks=-foo,-bar,...` on top of the repo-root `.clang-tidy`.
+There is exactly one place to update the disable list; no per-test
+config files.
+
+**Disabled on test targets:**
+
+- `cppcoreguidelines-non-private-member-variables-in-classes` and
+  its alias `misc-non-private-member-variables-in-classes`.
+  Idiomatic gtest fixtures put shared state in `protected:` so
+  derived `TEST_F` bodies can reach it; the check treats every
+  non-`private` member as encapsulation debt. Forcing `private:` +
+  `protected:` accessor pairs on every fixture is ceremony that no
+  reader benefits from.
+- `readability-function-cognitive-complexity`. Each
+  `EXPECT_*`/`ASSERT_*` expands to a nested switch/if that adds to
+  the score, so a straightforward "check every element" loop
+  exceeds the default threshold of 25 with four or more assertions.
+  Rather than extract helpers purely to appease the expansion, let
+  test bodies stay linear.
+
+**Still enforced — with a documented workaround:**
+
+- `bugprone-unchecked-optional-access` does not follow `ASSERT_TRUE`.
   The checker's dataflow analysis cannot see through gtest's
-  aborts-the-caller macro contract, so an `ASSERT_TRUE(opt.has_value())`
-  followed by `*opt` still trips. Pair the assertion with a plain
-  `if (opt.has_value())` around the dereference:
+  aborts-the-caller macro contract, so an
+  `ASSERT_TRUE(opt.has_value())` followed by `*opt` still trips.
+  This one is kept because the failure mode (dereferencing an empty
+  optional) is a real bug class outside gtest too. Pair the
+  assertion with a plain `if (opt.has_value())` around the
+  dereference:
   ```cpp
   ASSERT_TRUE(job.size_bytes.has_value());
   if (job.size_bytes.has_value()) {
     EXPECT_GT(*job.size_bytes, 0U);
   }
   ```
-
-- **`cppcoreguidelines-non-private-member-variables-in-classes` flags
-  `protected:` fixture members.** Idiomatic gtest puts shared fixture
-  state in `protected:` so test bodies (which derive the fixture)
-  can reach it, but the check treats every non-`private` member as
-  encapsulation debt. Put the member in `private:` and expose a
-  `protected: [[nodiscard]] const T& name() const` accessor; test
-  bodies call `name()`, fixture methods keep direct access to the
-  underlying member.
-
-- **`readability-function-cognitive-complexity` trips on test bodies
-  with ~4+ `EXPECT_*`/`ASSERT_*` inside a loop.** Each macro expands
-  to a nested switch/if that adds to the score, so a straightforward
-  "check every element" loop can exceed the default threshold (25).
-  Extract a free `void VerifyX(const T&)` helper in the anonymous
-  namespace and call it from the loop body. `ASSERT_*` from a helper
-  aborts the helper, not the test — that is the documented gtest
-  contract and is fine for field-by-field checks.
 
 ---
 

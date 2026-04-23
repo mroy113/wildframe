@@ -166,18 +166,29 @@ locally is the minimum before opening a PR.
   script refuses to check out a new SHA in a dirty vcpkg tree. Commit,
   stash, or point `VCPKG_ROOT` at a different directory before
   re-running.
+- **`cmake --build --preset tidy` is authoritative; direct
+  `run-clang-tidy` diverges on test files.** The preset applies the
+  tests-only check disables defined in
+  [cmake/ClangTooling.cmake](../cmake/ClangTooling.cmake) (see
+  [docs/STYLE.md §2.13](STYLE.md)); `run-clang-tidy` reads
+  `compile_commands.json` directly and does not see those
+  per-target overrides, so it will report
+  `cppcoreguidelines-non-private-member-variables-in-classes` and
+  `readability-function-cognitive-complexity` findings on test
+  files that the CI gate passes cleanly. Run the preset when you
+  need a trustworthy answer on test code.
 - **Direct `run-clang-tidy` needs an explicit macOS SDK sysroot.**
-  Homebrew LLVM does not auto-discover the Xcode SDK the way Apple
-  Clang does, so `/usr/local/opt/llvm/bin/run-clang-tidy -p build/debug
-  libs/<module>` fails with spurious `'filesystem' file not found`
-  cascades. The `cmake --build --preset tidy` gate passes the right
-  flags for you — run that first. If you need to iterate on one
-  module without reanalyzing the whole tree, copy the preset's flags:
+  Even with the caveat above, `run-clang-tidy` is still the fastest
+  way to iterate on a single non-test module. Homebrew LLVM does
+  not auto-discover the Xcode SDK the way Apple Clang does, so
+  `/usr/local/opt/llvm/bin/run-clang-tidy -p build/debug libs/<module>`
+  fails with spurious `'filesystem' file not found` cascades. Copy
+  the CI flags:
   ```bash
   SDK_PATH="$(xcrun --show-sdk-path)"
   /usr/local/opt/llvm/bin/run-clang-tidy -p build/debug \
     -clang-tidy-binary /usr/local/opt/llvm/bin/clang-tidy \
-    -extra-arg=-isysroot"${SDK_PATH}" -quiet libs/<module>
+    -extra-arg=-isysroot"${SDK_PATH}" -quiet libs/<module>/src
   ```
-  The invocation mirrors [.github/workflows/ci.yml](../.github/workflows/ci.yml)
-  so a local pass matches the CI gate exactly.
+  Target `libs/<module>/src` (not the whole module) to skip the
+  tests that would false-positive.

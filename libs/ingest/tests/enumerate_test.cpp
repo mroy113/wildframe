@@ -44,8 +44,6 @@ class EnumerateTest : public ::testing::Test {
     std::filesystem::remove_all(root_, ignored);
   }
 
-  [[nodiscard]] const std::filesystem::path& root() const { return root_; }
-
   // CR3 with a valid ftyp/crx header plus trailing junk. Sufficient for
   // the magic-bytes check; we never decode.
   void WriteCr3(const std::filesystem::path& relative) const {
@@ -76,43 +74,25 @@ class EnumerateTest : public ::testing::Test {
     stream << "hello";
   }
 
- private:
   std::filesystem::path root_;
 };
-
-// Assertions factored out of `CR3FilesEmittedNonCR3Skipped` to keep that
-// test body under the `readability-function-cognitive-complexity`
-// threshold; `ASSERT_*` macros compose fine from a helper because gtest
-// only requires the caller to return `void`.
-void ExpectValidCr3Job(const wildframe::ingest::ImageJob& job) {
-  EXPECT_EQ(job.path.extension(), ".CR3");
-  EXPECT_EQ(job.format, wildframe::ingest::Format::kCr3);
-  ASSERT_TRUE(job.size_bytes.has_value());
-  // Second `has_value()` check satisfies `bugprone-unchecked-optional-
-  // access`; the dataflow analysis cannot model gtest's
-  // `ASSERT_*`-aborts-the-caller contract, so we pair the assertion
-  // with a plain `if` to make the access self-evidently safe.
-  if (job.size_bytes.has_value()) {
-    EXPECT_GT(*job.size_bytes, 0U);
-  }
-}
 
 // --- Empty / malformed input ---------------------------------------------
 
 TEST_F(EnumerateTest, EmptyDirectoryReturnsEmptyVector) {
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   EXPECT_TRUE(jobs.empty());
 }
 
 TEST_F(EnumerateTest, NonexistentDirectoryThrowsIngestError) {
-  const std::filesystem::path missing = root() / "does-not-exist";
+  const std::filesystem::path missing = root_ / "does-not-exist";
   EXPECT_THROW(
       { (void)wildframe::ingest::Enumerate(missing); },
       wildframe::ingest::IngestError);
 }
 
 TEST_F(EnumerateTest, FilePathThrowsIngestError) {
-  const std::filesystem::path file = root() / "a.CR3";
+  const std::filesystem::path file = root_ / "a.CR3";
   WriteCr3("a.CR3");
   EXPECT_THROW(
       { (void)wildframe::ingest::Enumerate(file); },
@@ -121,7 +101,7 @@ TEST_F(EnumerateTest, FilePathThrowsIngestError) {
 
 TEST_F(EnumerateTest, NegativeMaxDepthThrowsIngestError) {
   EXPECT_THROW(
-      { (void)wildframe::ingest::Enumerate(root(), -1); },
+      { (void)wildframe::ingest::Enumerate(root_, -1); },
       wildframe::ingest::IngestError);
 }
 
@@ -133,16 +113,26 @@ TEST_F(EnumerateTest, CR3FilesEmittedNonCR3Skipped) {
   WriteNonCr3("readme.txt");
   WriteNonCr3("sidecar.xmp");
 
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 2U);
   for (const auto& job : jobs) {
-    ExpectValidCr3Job(job);
+    EXPECT_EQ(job.path.extension(), ".CR3");
+    EXPECT_EQ(job.format, wildframe::ingest::Format::kCr3);
+    ASSERT_TRUE(job.size_bytes.has_value());
+    // Second `has_value()` check satisfies
+    // `bugprone-unchecked-optional-access`; the dataflow analysis
+    // cannot model gtest's `ASSERT_*`-aborts-the-caller contract, so
+    // we pair the assertion with a plain `if` to make the access
+    // self-evidently safe. See docs/STYLE.md §2.13.
+    if (job.size_bytes.has_value()) {
+      EXPECT_GT(*job.size_bytes, 0U);
+    }
   }
 }
 
 TEST_F(EnumerateTest, LowercaseExtensionAccepted) {
   WriteCr3("a.cr3");
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 1U);
 }
 
@@ -150,7 +140,7 @@ TEST_F(EnumerateTest, FakeCR3HeaderIsSkipped) {
   WriteCr3("good.CR3");
   WriteFakeCr3("bad.CR3");
 
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 1U);
   EXPECT_EQ(jobs.front().path.filename(), "good.CR3");
 }
@@ -162,7 +152,7 @@ TEST_F(EnumerateTest, ResultIsSortedByPath) {
   WriteCr3("alpha.CR3");
   WriteCr3("mango.CR3");
 
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 3U);
   for (auto current = std::next(jobs.begin()); current != jobs.end();
        ++current) {
@@ -177,7 +167,7 @@ TEST_F(EnumerateTest, DefaultDepthOneDescendsOneLevel) {
   WriteCr3("sub/inside.CR3");
   WriteCr3("sub/deeper/buried.CR3");
 
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 2U);
   EXPECT_EQ(jobs.front().path.filename(), "inside.CR3");
   EXPECT_EQ(jobs.back().path.filename(), "top.CR3");
@@ -187,7 +177,7 @@ TEST_F(EnumerateTest, MaxDepthZeroStaysInRoot) {
   WriteCr3("top.CR3");
   WriteCr3("sub/inside.CR3");
 
-  const auto jobs = wildframe::ingest::Enumerate(root(), 0);
+  const auto jobs = wildframe::ingest::Enumerate(root_, 0);
   ASSERT_EQ(jobs.size(), 1U);
   EXPECT_EQ(jobs.front().path.filename(), "top.CR3");
 }
@@ -195,8 +185,8 @@ TEST_F(EnumerateTest, MaxDepthZeroStaysInRoot) {
 TEST_F(EnumerateTest, DeepTreeReachedWithLargerDepth) {
   WriteCr3("a/b/c/d.CR3");
 
-  EXPECT_EQ(wildframe::ingest::Enumerate(root(), 2).size(), 0U);
-  EXPECT_EQ(wildframe::ingest::Enumerate(root(), 3).size(), 1U);
+  EXPECT_EQ(wildframe::ingest::Enumerate(root_, 2).size(), 0U);
+  EXPECT_EQ(wildframe::ingest::Enumerate(root_, 3).size(), 1U);
 }
 
 // --- Symlink skip --------------------------------------------------------
@@ -205,13 +195,13 @@ TEST_F(EnumerateTest, SymlinksAreSkipped) {
   WriteCr3("real.CR3");
 
   std::error_code link_error;
-  std::filesystem::create_symlink(root() / "real.CR3", root() / "link.CR3",
+  std::filesystem::create_symlink(root_ / "real.CR3", root_ / "link.CR3",
                                   link_error);
   if (link_error) {
     GTEST_SKIP() << "symlink creation unsupported: " << link_error.message();
   }
 
-  const auto jobs = wildframe::ingest::Enumerate(root());
+  const auto jobs = wildframe::ingest::Enumerate(root_);
   ASSERT_EQ(jobs.size(), 1U);
   EXPECT_EQ(jobs.front().path.filename(), "real.CR3");
 }
@@ -221,7 +211,7 @@ TEST_F(EnumerateTest, SymlinksAreSkipped) {
 TEST_F(EnumerateTest, PathsAreAbsolute) {
   WriteCr3("a.CR3");
   const auto jobs = wildframe::ingest::Enumerate(
-      std::filesystem::path{"."} / std::filesystem::relative(root()));
+      std::filesystem::path{"."} / std::filesystem::relative(root_));
   ASSERT_EQ(jobs.size(), 1U);
   EXPECT_TRUE(jobs.front().path.is_absolute()) << jobs.front().path.string();
 }
