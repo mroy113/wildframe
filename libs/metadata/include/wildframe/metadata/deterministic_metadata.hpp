@@ -7,10 +7,12 @@
 /// not from Wildframe's pipeline, so they round-trip identically across
 /// re-analyses.
 ///
-/// Every field is `std::optional<T>`: a missing EXIF tag stays
+/// EXIF-sourced fields are `std::optional<T>`: a missing tag stays
 /// `std::nullopt` rather than being coerced to a sentinel, so callers can
 /// distinguish "camera did not record this" from "camera recorded zero"
-/// (handoff §13, `docs/METADATA.md` §6, §7.4).
+/// (handoff §13, `docs/METADATA.md` §6, §7.4). Filesystem-derived fields
+/// (`file_path`, `file_name`) are bare types — `ReadExif` is called with
+/// a path, so it cannot produce a record without one.
 ///
 /// Value type, Rule of Zero (`docs/STYLE.md` §2.5). Plain aggregate —
 /// public data members use bare `snake_case` per STYLE §2.1.
@@ -40,17 +42,18 @@ struct ImageDimensions {
 
 /// Camera-recorded metadata for a single RAW file. Populated by the
 /// Exiv2-backed reader in M5-02; TB-06's stub reader returns an instance
-/// with every field `std::nullopt`. Downstream stages consume this by
-/// value or `const&`.
+/// with only the filesystem-derived fields set and every EXIF-sourced
+/// field `std::nullopt`. Downstream stages consume this by value or
+/// `const&`.
 struct DeterministicMetadata {
   /// Absolute canonical path to the RAW file on disk. Filesystem-
-  /// derived, not EXIF-derived, but listed alongside EXIF fields in the
-  /// handoff §13 schema; the reader always populates it in practice.
-  std::optional<std::filesystem::path> file_path;
+  /// derived — `ReadExif` is always called with a path, so this is
+  /// always populated and is not wrapped in `std::optional`.
+  std::filesystem::path file_path;
 
   /// File basename including the RAW extension (e.g. `IMG_0421.CR3`).
-  /// Filesystem-derived; see `file_path`.
-  std::optional<std::string> file_name;
+  /// Filesystem-derived alongside `file_path`; always populated.
+  std::string file_name;
 
   /// Capture timestamp (`exif:DateTimeOriginal`), normalized to UTC by
   /// the reader. Stored as a `time_point` rather than a raw EXIF string
