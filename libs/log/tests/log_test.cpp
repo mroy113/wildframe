@@ -39,7 +39,7 @@ void init_with_capture(
   cfg.level = level;
   cfg.enable_stdout = false;
   cfg.extra_sinks.push_back(sink);
-  wildframe::log::init(cfg);
+  wildframe::log::Init(cfg);
 }
 
 TEST(WildframeLog, RegistersAllModuleTagsFromStyleSpec) {
@@ -50,7 +50,7 @@ TEST(WildframeLog, RegistersAllModuleTagsFromStyleSpec) {
     EXPECT_NE(spdlog::get(tag), nullptr) << "missing logger for tag: " << tag;
   }
 
-  wildframe::log::shutdown();
+  wildframe::log::Shutdown();
 }
 
 TEST(WildframeLog, ReinitDropsAndRecreatesLoggers) {
@@ -66,7 +66,7 @@ TEST(WildframeLog, ReinitDropsAndRecreatesLoggers) {
   EXPECT_NE(second, nullptr);
   EXPECT_NE(first, second);
 
-  wildframe::log::shutdown();
+  wildframe::log::Shutdown();
 }
 
 TEST(WildframeLog, ShutdownDropsRegisteredLoggers) {
@@ -74,7 +74,7 @@ TEST(WildframeLog, ShutdownDropsRegisteredLoggers) {
   init_with_capture(cap.sink);
   ASSERT_NE(spdlog::get("detect"), nullptr);
 
-  wildframe::log::shutdown();
+  wildframe::log::Shutdown();
 
   for (const auto* tag : kAllModuleTags) {
     EXPECT_EQ(spdlog::get(tag), nullptr)
@@ -102,7 +102,7 @@ TEST(WildframeLog, EmittedLineMatchesStylePatternAndTag) {
   // NOLINTNEXTLINE(readability-implicit-bool-conversion)
   EXPECT_TRUE(std::regex_search(out, kLine)) << "actual output: " << out;
 
-  wildframe::log::shutdown();
+  wildframe::log::Shutdown();
 }
 
 TEST(WildframeLog, AllLevelsCompileAndRouteToTaggedLogger) {
@@ -127,7 +127,7 @@ TEST(WildframeLog, AllLevelsCompileAndRouteToTaggedLogger) {
   EXPECT_NE(out.find("[error] [detect] e 5"), std::string::npos);
   EXPECT_NE(out.find("[critical] [detect] c 6"), std::string::npos);
 
-  wildframe::log::shutdown();
+  wildframe::log::Shutdown();
 }
 
 TEST(WildframeLog, HandleAndTagAreExposedAtNamespaceScope) {

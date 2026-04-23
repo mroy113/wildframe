@@ -216,6 +216,154 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ---
 
+## Sprint 2 — Tracer-bullet vertical slice
+
+One command produces a valid XMP sidecar + batch manifest row for every CR3 in a chosen directory, end-to-end, with every stage wired. Expensive stages (raw decode, detection, focus, AI-namespace XMP writes) ship as **stubs** that satisfy their public interfaces with sentinel returns; cheap stages (ingest, orchestrator skeleton, provenance-only XMP write, minimal batch manifest) ship real. Subsequent module sections replace each stub with its real implementation while keeping `TB-09` (end-to-end smoke) green. Strategy per [bird_photo_ai_project_handoff.md §18](../bird_photo_ai_project_handoff.md).
+
+Stubs are not TODOs. Every `TB-*` task lands with full Definition of Done (clang-format, clang-tidy zero findings, tests that pin the sentinel behavior). See [docs/STYLE.md §2.11](STYLE.md) — stubs have a live caller (the CLI) from the moment they ship, so they are not "speculative interface surface."
+
+### What actually lands in Sprint 2
+
+The sprint is not just the `TB-*` tasks. The following tasks from module sections below also land in Sprint 2 because the tracer-bullet slice depends on them being real, not stubbed:
+
+- **M1-02, M1-03, M1-04** — `wildframe_ingest`. The ingest stage ships **real** in the slice (cheap to implement, no reason to stub). TB-09 asserts on its output directly.
+- **M5-01** — `DeterministicMetadata` struct. TB-06's stub EXIF reader returns an instance of this type, so the struct must exist first.
+- **M5-06 is folded into TB-07** — TB-07 registers the `wildframe_provenance:*` namespace with the shape M5-06 describes. When TB-07 merges, check M5-06 off in the same PR and cite "landed as part of TB-07" in the checkbox-flip commit message.
+- **M6-01 is folded into TB-02** — TB-02 publishes the `PipelineStage` interface M6-01 describes. Close M6-01 the same way.
+- **M7-11 becomes runnable in Sprint 2.** Once TB-02 publishes the orchestrator skeleton, [src/CMakeLists.txt](../src/CMakeLists.txt) can drop its direct links to `wildframe::ingest / raw / detect / focus` and get them transitively. Pick it up after TB-02 lands rather than waiting for M7-01.
+
+### Suggested agent pickup order
+
+Agents picking tasks sequentially should work this order. Parallelizable clusters are grouped:
+
+1. **M1-02** (directory enumeration) and **TB-01** (CLI + TOML parser) — independent, can land in either order.
+2. **M1-03, M1-04** — both depend on M1-02.
+3. **M5-01** — depends only on S0-03 (done); can land in parallel with any of the above.
+4. **TB-02** — depends on TB-01 + M1-01 (done).
+5. **M7-11** — optional cleanup, runnable once TB-02 lands. Small.
+6. **TB-03, TB-04, TB-05, TB-06** — all depend on TB-02; TB-06 additionally depends on M5-01. Independent stubs in different modules; fine to parallelize if multiple agents are active.
+7. **TB-07, TB-08** — both depend on TB-02. Independent of each other.
+8. **TB-09** — depends on every task above. Closes the sprint.
+
+### TOML parser ownership
+
+Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus` config indirectly") the TOML parser lives in the **CLI/GUI entry point**, not in a module. Sprint 2's parser lives in `src/` alongside `main.cpp` and hands each downstream component a strongly-typed, pre-validated struct. The GUI entry point (Module 7) shares this parser when it lands.
+
+### What does *not* land in Sprint 2
+
+- No real ONNX Runtime link. TB-04 is a sentinel return; M3-01 introduces ONNX.
+- No real OpenCV link on the focus path. TB-05 is a sentinel; M4-* introduces OpenCV.
+- No `wildframe:*` AI-namespace or `wildframe_user:*` override XMP writes. Deferred to M5-05 / M5-07 / M5-08 / M5-10 to avoid committing sentinel floats to real XMP and polluting round-trip tests.
+- No worker thread, no job queue, no cancellation. TB-02 is synchronous; M6-02 / M6-03 / M6-08 thicken the orchestrator later.
+- No GUI. Module 7 builds on the already-thickened pipeline.
+
+- [ ] **TB-01** — CLI entry point + TOML config parser
+  - Deps: S0-03, S0-14, S0-18, S0-19
+  - Size: M
+  - Satisfies: §3 (delivery), FR-11
+  - Replace the placeholder body of [src/main.cpp](../src/main.cpp) with a real CLI entry point.
+  - **Arg parsing.** Hand-rolled loop over `argc`/`argv` — `--config <path>` (optional) and one positional `<directory>` (required). No new CLI-parsing dependency (NFR-6, no handoff-doc entry authorizing one). `--help` and `--version` are permissible, `-h`/`-v` shortcuts optional.
+  - **Config parser.** Lives in `src/` alongside `main.cpp` per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) (TOML parsing is a GUI/CLI concern, not a module concern). Uses `tomlplusplus` (already in [vcpkg.json](../vcpkg.json)). Resolves the config path per [docs/CONFIG.md §1.2](CONFIG.md) (CLI arg → `$XDG_CONFIG_HOME/wildframe/config.toml` → macOS fallback → built-in default at [data/config.default.toml](../data/config.default.toml)). Implements the fail-loud error model in CONFIG.md §1.5, §1.6, §5.
+  - **Per §2.11, parse only keys with live consumers in Sprint 2.** That is: `log_path`, `log_level`, `manifest_dir`, `reanalysis_default`. Keys under `[ingest]`, `[detect]`, `[focus]` are NOT parsed yet; they land with their owning thickening passes (M1-02, M3-*, M4-*). An unknown-key rejection (CONFIG.md §1.5) fires on the `[detect]` table today — that is intentional for the slice and the test fixture's config must not set those keys yet. M3-* and M4-* will each widen the parser in the same PR that adds their config consumer.
+  - **Environment boundary (STYLE §2.12).** One function in `src/` reads `$HOME` / `$XDG_CONFIG_HOME`. Every other function takes resolved `std::filesystem::path` parameters. Tests drive the parser with synthetic paths, never by mutating the process environment.
+  - **Entry-point shape.** Expose `int Run(int argc, const char* const* argv, std::ostream& err);` (or equivalent) in a header under `src/`. `main()` is a 3-line wrapper that calls `Run`; TB-09 calls `Run` directly rather than spawning a subprocess. This keeps the smoke test in-process and TSan/ASan-friendly.
+  - **Wiring.** On successful parse: initialize `wildframe::log` via `Init()` (S0-14) with the parsed `log_path` / `log_level`, hand the orchestrator (TB-02, lands next) its constructed stage list and the resolved `manifest_dir`, run the batch synchronously, return `0` on full success and a non-zero status distinguishing "configuration error" from "partial batch failure" (the latter is the M6-04 error-isolation surface; until M6-04 lands, any stage exception aborts the run).
+  - **Not in scope for this task.** No job queue, no worker thread, no cancellation — those are M6-02 / M6-03 / M6-08. No `reanalysis_default` handling yet — M7-10 consumes it; TB-01 only validates the value.
+  - CLI persists alongside the GUI once Module 7 lands. It is the headless / automation entry point already scoped by FR-10 and FR-11.
+
+- [ ] **TB-02** — Orchestrator skeleton (sequential)
+  - Deps: TB-01, M1-01
+  - Size: M
+  - Satisfies: NFR-3 (stage-registration extension point), §12 (data flow)
+  - **Folds M6-01** — when TB-02 merges, flip M6-01's checkbox in the same PR with the commit note "landed in TB-02".
+  - Publishes `libs/orchestrator/include/wildframe/orchestrator/pipeline_stage.hpp` with an abstract `PipelineStage` base: `virtual StageResult Process(StageContext&) = 0;` plus a `virtual ~PipelineStage() = default;`. `StageContext` carries the current `ImageJob` plus whatever the stage has produced so far (preview buffer, EXIF, detection, focus) — exact shape is this task's design call, but must be extensible without ABI thrash (prefer a struct of `std::optional<...>` members, not a variant).
+  - Publishes `libs/orchestrator/include/wildframe/orchestrator/orchestrator.hpp` additions: a class that accepts a `std::vector<std::unique_ptr<PipelineStage>>` (ownership transferred in), the resolved `manifest_dir`, and exposes `RunResult Run(std::span<const ingest::ImageJob> jobs)`. The MVP implementation is a plain `for`-loop over jobs on the calling thread — **no threading, no queue**. Those are M6-02 / M6-03 / M6-08, which may freely refactor this skeleton.
+  - Progress callback hook (`std::function<void(ProgressUpdate)>`) is accepted by the constructor and may be a no-op until M6-06 wires it.
+  - Links `src/` against `wildframe::orchestrator` (+ `wildframe::log` + `wildframe::metadata`); the direct links to ingest/raw/detect/focus in [src/CMakeLists.txt](../src/CMakeLists.txt) become transitive. M7-11 closes this cleanup.
+  - Error isolation is **not** wired yet — a stage exception propagates out of `Run` and aborts the CLI. M6-04 catches them and writes manifest rows.
+
+- [ ] **TB-03** — Stub `wildframe_raw` preview/decode
+  - Deps: TB-02
+  - Size: S
+  - **Introduces** the public `PreviewImage` type in `libs/raw/include/wildframe/raw/preview_image.hpp` — the output type of every raw-decode operation and the input type of `wildframe_detect` / `wildframe_focus`. Shape: `{int width, int height, std::vector<std::uint8_t> rgb_bytes}` or similar. Value type, Rule of Zero (STYLE §2.5). `BBox` — used by `decode_crop` — lives in `wildframe_detect`'s public header per TB-04 (it is produced by detect, consumed by raw and focus).
+  - **Introduces** `PreviewImage ExtractPreview(const std::filesystem::path&)` and `PreviewImage DecodeCrop(const std::filesystem::path&, const BBox&)` declarations in `libs/raw/include/wildframe/raw/raw.hpp` — the signatures M2-01 / M2-02 will satisfy unchanged.
+  - Stub implementation returns a deterministic synthetic 256×256 RGB buffer filled with mid-gray (128,128,128). `DecodeCrop` returns a buffer sized to the requested bbox, same gray fill. No LibRaw link yet.
+  - Publishes a `RawStage : PipelineStage` in `libs/raw/src/raw_stage.cpp` that calls `ExtractPreview` and writes the result into `StageContext`. TB-02's orchestrator receives an instance of this stage.
+  - Tests (`libs/raw/tests/raw_test.cpp`): buffer dimensions, determinism across calls, non-empty-for-any-fixture-path. Replaced by M2-01 / M2-02.
+
+- [ ] **TB-04** — Stub `wildframe_detect` stage
+  - Deps: TB-02, TB-03 (for `PreviewImage`)
+  - Size: S
+  - **Introduces** the public `BBox` type in `libs/detect/include/wildframe/detect/bbox.hpp` — `{float x, float y, float width, float height}` with a member `float Area() const noexcept`. Re-used by `wildframe_raw::DecodeCrop` and `wildframe_focus::Score`.
+  - **Introduces** the public `DetectionResult` and `DetectConfig` types in `libs/detect/include/wildframe/detect/detect.hpp`. `DetectionResult` fields per handoff §13. `DetectConfig` is empty for now; the real fields (`confidence_threshold`, `iou_threshold`, `model`, `execution_provider`) land with M3-01 / M3-03 / M3-06 in the same PR that parses those TOML keys.
+  - **Introduces** `DetectionResult Detect(const raw::PreviewImage&, const DetectConfig&)` declaration — the signature M3-05 will satisfy unchanged.
+  - Stub returns `DetectionResult{bird_present=false, bird_count=0, bird_boxes={}, primary_subject_box=std::nullopt, detection_confidence=0.0F}` regardless of input. No ONNX Runtime link — the `wildframe_detect` CMake target does not depend on `onnxruntime` until M3-01 wires it.
+  - Publishes a `DetectStage : PipelineStage` in `libs/detect/src/detect_stage.cpp`.
+  - Tests pin the sentinel return. Replaced by M3-01..M3-05.
+
+- [ ] **TB-05** — Stub `wildframe_focus` stage
+  - Deps: TB-02, TB-03 (for `PreviewImage`), TB-04 (for `BBox`)
+  - Size: S
+  - **Introduces** the public `FocusResult` and `FocusConfig` types in `libs/focus/include/wildframe/focus/focus.hpp`. `FocusResult`: `{float focus_score, float motion_blur_score, float subject_size_percent, float keeper_score, std::array<bool, 4> edge_clipped}` per handoff §13 and docs/METADATA.md §3.2. `FocusConfig` is empty for now; real fields (`laplacian_saturation`, keeper weights, edge clipping tolerance) land with M4-02 / M4-04 / M4-05 in the same PR that parses those TOML keys.
+  - **Introduces** `FocusResult Score(const raw::PreviewImage&, const std::optional<detect::BBox>&, const FocusConfig&)` — the signature M4-06 will satisfy unchanged.
+  - Stub returns `FocusResult{focus_score=0.0F, motion_blur_score=0.0F, subject_size_percent=0.0F, keeper_score=0.0F, edge_clipped={false,false,false,false}}` regardless of input. No OpenCV link — the `wildframe_focus` CMake target does not depend on `opencv4` until M4-01 wires it.
+  - Publishes a `FocusStage : PipelineStage`. Tests pin the sentinel return. Replaced by M4-01..M4-07.
+
+- [ ] **TB-06** — Stub `wildframe_metadata` EXIF reader
+  - Deps: TB-02, M5-01
+  - Size: S
+  - **Introduces** `metadata::DeterministicMetadata ReadExif(const std::filesystem::path&)` declaration in `libs/metadata/include/wildframe/metadata/metadata.hpp` — the signature M5-02 will satisfy unchanged.
+  - Stub returns a `DeterministicMetadata` with every `std::optional<T>` field as `std::nullopt` regardless of input. No Exiv2 read-side link yet (TB-07 separately introduces the Exiv2 *write* link; both sides converge when M5-02 thickens the read path).
+  - Publishes a `MetadataReadStage : PipelineStage`. Tests pin that every field is `nullopt`. Replaced by M5-02..M5-04.
+
+- [ ] **TB-07** — Provenance-only XMP sidecar writer
+  - Deps: TB-02
+  - Size: M
+  - Satisfies: FR-5 (partial), NFR-5
+  - **Folds M5-06** — when TB-07 merges, flip M5-06's checkbox in the same PR with the commit note "landed as part of TB-07".
+  - Links `wildframe_metadata` against Exiv2 for the first time. Registers the `wildframe_provenance:*` namespace per handoff §13 + [docs/METADATA.md §4](METADATA.md). Writes `<raw>.xmp` via Exiv2's high-level API using the temp-file-plus-rename idiom (M5-08 will reuse this machinery unchanged).
+  - Populated provenance fields on every sidecar: `analysis_timestamp` (ISO-8601, local), `pipeline_version` (from a single compile-time constant — add `libs/metadata/include/wildframe/metadata/version.hpp` with `constexpr std::string_view kPipelineVersion = "0.0.0";`), `detector_model_name = "stub"`, `detector_model_version = "0.0.0"`, `focus_algorithm_version = "0.0.0"`.
+  - **`wildframe:*` AI-namespace and `wildframe_user:*` override namespace are deliberately deferred** to M5-05 / M5-07 / M5-08 / M5-10. The AI namespace would only carry sentinels anyway, and writing sentinels as real XMP pollutes the round-trip test surface for the thickening passes.
+  - Publishes a `MetadataWriteStage : PipelineStage` in `libs/metadata/src/metadata_write_stage.cpp`. The stage pulls whatever is in `StageContext` (stub DetectionResult, stub FocusResult) and writes **only** provenance fields, ignoring the AI data for now. M5-08 rewires the stage to emit AI fields once the AI namespace exists.
+  - Tests: write a sidecar for a fixture CR3, reopen it with Exiv2, verify the five provenance fields are present and correctly typed. Temp-file-plus-rename atomicity test: kill a write mid-flight (simulate via an injected throwing sink or by crashing on a callback) and confirm the original file is intact.
+
+- [ ] **TB-08** — Minimal batch manifest writer
+  - Deps: TB-02, S0-19
+  - Size: S
+  - Satisfies: FR-5 (partial), NFR-5
+  - Publishes a `BatchManifestWriter` type in `libs/orchestrator/` (same module as `paths.hpp` — manifest is an orchestrator responsibility per [docs/ARCHITECTURE.md §3](ARCHITECTURE.md)). Constructs from the resolved `manifest_dir` (`orchestrator::DefaultManifestDir(home)` unless overridden). On open, creates the directory if missing and opens `<manifest_dir>/<ISO-8601-timestamp>.json` for writing.
+  - Shape (nlohmann/json, pretty-printed for human inspection during MVP):
+    ```json
+    { "pipeline_version": "0.0.0",
+      "started_at":  "<ISO-8601>",
+      "finished_at": "<ISO-8601>",
+      "status": "completed" | "partial",
+      "images": [ { "input_path": "...", "sidecar_path": "...",
+                    "stage_timings_ms": { "ingest": ..., "raw": ..., ... },
+                    "error": null } ] }
+    ```
+  - `status` is `completed` when every job returns without exception, `partial` otherwise. `cancelled` status lands with M6-08. Per-image `error` stays `null` for Sprint 2 — per-image error isolation is M6-04; until then, a stage exception aborts the run and `BatchManifestWriter` finishes the current partial file in its destructor.
+  - The orchestrator (TB-02) wires this: constructs the writer before `Run`, appends a row per job completion, calls `Finalize(status)` before returning. M6-05 extends the shape (more fields, richer timings, error rows) rather than rewriting.
+  - Tests: write a manifest over a synthetic job list, reopen with nlohmann/json, assert the row count and timestamp shape. Assert the file survives a destructor-during-write path.
+
+- [ ] **TB-09** — End-to-end CLI smoke test
+  - Deps: TB-01, TB-02, TB-03, TB-04, TB-05, TB-06, TB-07, TB-08, M1-02, M1-03, M1-04, S0-12
+  - Size: S
+  - Satisfies: NFR-6
+  - GoogleTest integration test living at [tests/e2e_cli_test.cpp](../tests/) (the top-level `tests/` directory exists but is empty — this is its first inhabitant, so also add `tests/CMakeLists.txt` and wire it into the root build). Uses a `gtest` target named `wildframe_e2e_test`.
+  - Calls `Run(argc, argv, err)` from TB-01 directly — **not** a subprocess spawn. Keeps the test in-process, TSan/ASan-friendly, and fast.
+  - Per test case: copy the S0-12 fixture tree into a `testing::TempDir()` (fixtures must not be mutated in place — XMP sidecars are written next to the RAW), point the CLI at that copy, pass a synthetic config that overrides `log_path` and `manifest_dir` into the temp dir too so the test does not touch `~/Library/Logs/`.
+  - Assertions:
+    - `Run` returns `0`.
+    - One `*.xmp` sidecar next to every fixture CR3.
+    - Each sidecar opens with Exiv2 and contains the five provenance fields from TB-07.
+    - Exactly one manifest file exists under the temp `manifest_dir`.
+    - The manifest parses as JSON, has `status: "completed"`, has one `images[]` row per fixture, and each row's `sidecar_path` exists.
+  - **Re-run as each thickening pass lands.** Any regression blocks that pass's merge. As stubs are replaced, extend this test with per-thickening assertions (e.g., after M3-* lands, assert `bird_present` is true on the "clear bird" fixture) rather than creating a new smoke test.
+  - Supersedes the original plan for `I-01` as a CLI-side end-to-end test; `I-01` is re-scoped to GUI-coupled end-to-end validation.
+
+---
+
 ## Module 1 — `wildframe_ingest` (FR-1)
 
 - [x] **M1-01** — `ImageJob` public struct
@@ -227,18 +375,21 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Deps: M1-01
   - Size: M
   - Satisfies: FR-1
-  - `std::vector<ImageJob> enumerate(const std::filesystem::path& dir, int max_depth = 1)`. Skips symlinks by default. Returns sorted by path for determinism.
+  - **Lands in Sprint 2** — `wildframe_ingest` ships real in the tracer-bullet slice; TB-09 consumes this output directly.
+  - `std::vector<ImageJob> Enumerate(const std::filesystem::path& dir, int max_depth = 1)`. Skips symlinks by default. Returns sorted by path for determinism. Consumes the `[ingest].max_depth` TOML key — widens TB-01's parser with that key in the same PR.
 
 - [ ] **M1-03** — CR3 file validation
   - Deps: M1-02
   - Size: S
   - Satisfies: FR-1
+  - **Lands in Sprint 2** — TB-09 requires the fixture tree's CR3s to validate and non-CR3s to be skipped.
   - Validate by extension + magic bytes. Malformed files are logged and skipped, not aborted.
 
 - [ ] **M1-04** — Error translation at boundary
   - Deps: M1-02
   - Size: S
   - Satisfies: NFR-7 (exception policy)
+  - **Lands in Sprint 2** — TB-09 expects the CLI not to crash on a bad fixture path; the orchestrator catches `IngestError` at the module boundary per STYLE §3.1.
   - Filesystem exceptions caught, translated to `wildframe::ingest::IngestError`.
 
 - [ ] **M1-05** — Unit tests for ingest
@@ -251,17 +402,19 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ## Module 2 — `wildframe_raw` (FR-2)
 
+Thickening pass — replaces the **TB-03** stub. Each task below lands without regressing TB-09.
+
 - [ ] **M2-01** — LibRaw preview extraction API
   - Deps: S0-03
   - Size: M
   - Satisfies: FR-2
-  - `PreviewImage extract_preview(const std::filesystem::path& raw_path)`. Returns largest embedded JPEG as decoded RGB buffer + dimensions. RAII wrapper around `LibRaw` handle.
+  - `PreviewImage ExtractPreview(const std::filesystem::path& raw_path)`. Returns largest embedded JPEG as decoded RGB buffer + dimensions. RAII wrapper around `LibRaw` handle.
 
 - [ ] **M2-02** — Full-decode crop API (fallback)
   - Deps: M2-01
   - Size: M
   - Satisfies: FR-2, FR-4
-  - `CroppedImage decode_crop(const std::filesystem::path& raw_path, BBox crop_region)`. Used only when preview resolution is insufficient for focus scoring.
+  - `CroppedImage DecodeCrop(const std::filesystem::path& raw_path, BBox crop_region)`. Used only when preview resolution is insufficient for focus scoring.
 
 - [ ] **M2-03** — Exception translation at boundary
   - Deps: M2-01
@@ -279,16 +432,19 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ## Module 5a — `wildframe_metadata` (EXIF read portion of FR-5)
 
+Thickening pass — replaces the **TB-06** stub (M5-02..M5-04). M5-01 lands before TB-06 so the stub can return the real struct type.
+
 - [ ] **M5-01** — `DeterministicMetadata` struct
   - Deps: S0-03
   - Size: S
-  - Public header: `libs/metadata/include/wildframe/metadata/deterministic_metadata.hpp`. All fields from handoff §13 deterministic-metadata list. Value type.
+  - **Lands in Sprint 2** — TB-06's stub EXIF reader returns a `DeterministicMetadata` instance, so the struct must exist first.
+  - Public header: `libs/metadata/include/wildframe/metadata/deterministic_metadata.hpp`. All fields from handoff §13 deterministic-metadata list. Every field is `std::optional<T>` — missing EXIF tags stay `nullopt` rather than forcing a sentinel value. Value type, Rule of Zero.
 
 - [ ] **M5-02** — Exiv2 EXIF reader
   - Deps: M5-01
   - Size: M
   - Satisfies: FR-5
-  - `DeterministicMetadata read_exif(const std::filesystem::path& raw_path)`. Maps Exiv2 keys to struct fields per the schema. Missing fields become `std::optional::nullopt`.
+  - `DeterministicMetadata ReadExif(const std::filesystem::path& raw_path)`. Maps Exiv2 keys to struct fields per the schema. Missing fields become `std::optional::nullopt`.
 
 - [ ] **M5-03** — Exception translation at boundary
   - Deps: M5-02
@@ -305,6 +461,8 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 ---
 
 ## Module 3 — `wildframe_detect` (FR-3)
+
+Thickening pass — replaces the **TB-04** stub. Introduces the `onnxruntime` link for the first time. Each task lands without regressing TB-09.
 
 - [ ] **M3-01** — ONNX Runtime session wrapper
   - Deps: S0-03, S0-11
@@ -331,7 +489,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 - [ ] **M3-05** — Top-level `detect` API
   - Deps: M3-04
   - Size: S
-  - `DetectionResult detect(const PreviewImage& preview, const DetectConfig& cfg)`.
+  - `DetectionResult Detect(const PreviewImage& preview, const DetectConfig& cfg)`.
 
 - [ ] **M3-06** — MegaDetector alternative path
   - Deps: M3-05
@@ -348,6 +506,8 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 ---
 
 ## Module 4 — `wildframe_focus` (FR-4)
+
+Thickening pass — replaces the **TB-05** stub. Introduces the `opencv` link on the focus side for the first time. Each task lands without regressing TB-09.
 
 - [ ] **M4-01** — Bird crop extraction utility
   - Deps: S0-03
@@ -381,7 +541,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 - [ ] **M4-06** — Top-level `score` API
   - Deps: M4-05
   - Size: S
-  - `FocusResult score(const PreviewImage& preview, const BBox& primary_subject, const FocusConfig& cfg)`.
+  - `FocusResult Score(const PreviewImage& preview, const BBox& primary_subject, const FocusConfig& cfg)`.
 
 - [ ] **M4-07** — Unit tests for focus
   - Deps: M4-06, S0-12
@@ -393,6 +553,8 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ## Module 5b — `wildframe_metadata` (XMP write portion of FR-5 + FR-6)
 
+Thickening pass — **extends** the **TB-07** provenance-only writer with the `wildframe:*` AI namespace (M5-05, M5-08) and the `wildframe_user:*` override namespace (M5-07, M5-10), plus sidecar read (M5-09) and round-trip coverage (M5-11). TB-07's provenance-namespace registration (M5-06 shape) and temp-file-plus-rename idiom (M5-08 shape) land in TB-07 and are reused here — these tasks extend rather than rewrite.
+
 - [ ] **M5-05** — `wildframe:*` XMP namespace registration
   - Deps: M5-03
   - Size: S
@@ -403,7 +565,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Deps: M5-05
   - Size: S
   - Satisfies: NFR-5
-  - Fields per handoff §13.
+  - **Folded into TB-07.** TB-07 registers this namespace and its fields per handoff §13 / [docs/METADATA.md §4](METADATA.md). Flip this checkbox in the TB-07 PR with the commit note "landed as part of TB-07". Preserved as a task ID only for traceability.
 
 - [ ] **M5-07** — `wildframe_user:*` namespace
   - Deps: M5-05
@@ -415,7 +577,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Deps: M5-05, M5-06
   - Size: M
   - Satisfies: FR-5
-  - `void write_sidecar(const std::filesystem::path& raw_path, const AiMetadata& ai, const ProvenanceMetadata& prov)`. Uses Exiv2 high-level API only. Atomic write via temp-file + rename. Preserves existing non-wildframe XMP content.
+  - `void WriteSidecar(const std::filesystem::path& raw_path, const AiMetadata& ai, const ProvenanceMetadata& prov)`. Uses Exiv2 high-level API only. Atomic write via temp-file + rename. Preserves existing non-wildframe XMP content.
 
 - [ ] **M5-09** — XMP sidecar reader
   - Deps: M5-05, M5-06, M5-07
@@ -427,7 +589,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Deps: M5-07, M5-08
   - Size: S
   - Satisfies: FR-6
-  - `void write_user_override(const std::filesystem::path& raw_path, const UserOverride& override)`. Does not modify the AI namespace.
+  - `void WriteUserOverride(const std::filesystem::path& raw_path, const UserOverride& override)`. Does not modify the AI namespace.
 
 - [ ] **M5-11** — Round-trip tests
   - Deps: M5-08, M5-09, M5-10
@@ -439,22 +601,24 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
 
 ## Module 6 — `wildframe_orchestrator` (wires everything)
 
+Thickening pass — **extends** the **TB-02** sequential skeleton with the job queue (M6-02), the worker thread + full sequential pipeline execution (M6-03), per-image error isolation (M6-04), the full batch manifest (M6-05 extends TB-08), the progress callback (M6-06), and cooperative cancellation (M6-08). M6-01's `PipelineStage` interface publishes in TB-02. Each task lands without regressing TB-09.
+
 - [ ] **M6-01** — `PipelineStage` interface for extensibility
   - Deps: S0-03
   - Size: M
   - Satisfies: NFR-3
-  - Abstract base with `process(const Job&) -> StageResult`. MVP has three concrete stages: `DetectStage`, `FocusStage`, `MetadataWriteStage`. Phase 2+ can add stages without touching the orchestrator core.
+  - **Folded into TB-02.** TB-02 publishes `PipelineStage` and the concrete stage classes (`RawStage`, `DetectStage`, `FocusStage`, `MetadataReadStage`, `MetadataWriteStage`) land with the respective TB-03..TB-07 stubs. Phase 2+ can add stages without touching the orchestrator core. Flip this checkbox in the TB-02 PR with the commit note "landed in TB-02". Preserved as a task ID only for traceability.
 
 - [ ] **M6-02** — Job queue
   - Deps: M6-01
   - Size: M
   - Thread-safe FIFO. MVP is single-consumer, but the interface supports multi-consumer for Phase 2+.
 
-- [ ] **M6-03** — Sequential pipeline execution
-  - Deps: M6-02, M1-05, M2-04, M5-04, M3-07, M4-07, M5-11
+- [ ] **M6-03** — Worker-thread pipeline execution
+  - Deps: TB-02, M6-02
   - Size: M
-  - Satisfies: §12 (data flow)
-  - Worker thread drains the queue. Per job: ingest → raw → metadata (EXIF read) → detect → focus → metadata (XMP write).
+  - Satisfies: §12 (data flow), NFR-9 (thread safety)
+  - Upgrades TB-02's synchronous `Run` to a background worker thread that drains the M6-02 job queue. Per-job stage sequence (ingest → raw → metadata EXIF read → detect → focus → metadata XMP write) is unchanged — TB-02 already wired it — this task just moves the loop off the caller's thread. Publishes the thread-safety contract in `libs/orchestrator/include/wildframe/orchestrator/orchestrator.hpp` per NFR-9.
 
 - [ ] **M6-04** — Per-image error isolation
   - Deps: M6-03
@@ -473,17 +637,17 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Size: S
   - `std::function<void(ProgressUpdate)>` invoked per job completion. Used by the GUI.
 
-- [ ] **M6-07** — Unit + integration tests for orchestrator
-  - Deps: M6-05, M6-06
+- [ ] **M6-07** — Orchestrator-specific integration tests
+  - Deps: M6-03, M6-04, M6-05, M6-06, M6-08
   - Size: M
   - Satisfies: NFR-6
-  - Integration test: run the full pipeline over all S0-12 fixtures, verify all produced XMP sidecars and the batch manifest.
+  - End-to-end smoke over the fixture set is already covered by TB-09. This task adds the orchestrator-specific behavior TB-09 does not: per-image error isolation (inject a failing stage, assert other jobs continue and the manifest row carries the error), cooperative cancellation (cancel mid-batch, assert partial results are retained and manifest status is `cancelled`), worker-thread safety (assert `Run` returns before the worker finishes and progress callbacks marshal correctly), and the full manifest shape M6-05 exposes.
 
 - [ ] **M6-08** — Cooperative batch cancellation
   - Deps: M6-03
   - Size: M
   - Satisfies: FR-9
-  - Orchestrator exposes a `cancel()` method. When set, the worker finishes the current per-image step, writes any partial output for that image if stage boundaries allow, stops dispatching new work, records `status: cancelled` in the manifest, and returns. No forceful thread termination.
+  - Orchestrator exposes a `Cancel()` method. When set, the worker finishes the current per-image step, writes any partial output for that image if stage boundaries allow, stops dispatching new work, records `status: cancelled` in the manifest, and returns. No forceful thread termination.
 
 ---
 
@@ -540,7 +704,7 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Deps: M7-03, M6-08
   - Size: S
   - Satisfies: FR-9
-  - Cancel button in the progress view invokes the orchestrator's `cancel()`. UI reflects `cancelling…` state until the worker confirms completion, then shows partial-results summary.
+  - Cancel button in the progress view invokes the orchestrator's `Cancel()`. UI reflects `cancelling…` state until the worker confirms completion, then shows partial-results summary.
 
 - [ ] **M7-10** — Re-analysis prompt dialog
   - Deps: M7-01, M5-09, S0-21
@@ -548,21 +712,22 @@ Not part of the Sprint 0 scaffolding contract, not gating any module work. Lives
   - Satisfies: FR-10
   - On batch start, scan for existing `wildframe:*` sidecars. If any exist, show modal with three options (skip already-analyzed, overwrite all, cancel) and a count of how many files are affected. Per-file override is exposed later from the detail view (part of M7-07). Decision recorded to manifest and `wildframe_user:reanalysis_policy_used`.
 
-- [ ] **M7-11** — Trim GUI link line to architectural contract
-  - Deps: M7-01
+- [ ] **M7-11** — Trim CLI / GUI link line to architectural contract
+  - Deps: TB-02
   - Size: S
   - Satisfies: NFR-3, NFR-6
-  - [src/CMakeLists.txt](../src/CMakeLists.txt) currently links the stub `wildframe` executable against all six static libraries. [docs/ARCHITECTURE.md §1](ARCHITECTURE.md) specifies the GUI depends only on `wildframe::orchestrator` and `wildframe::metadata`; the other four are indirect. Once M7-01 introduces real GUI code, remove the direct links to `wildframe::ingest`, `wildframe::raw`, `wildframe::detect`, `wildframe::focus` so the module boundary is enforced by the build, not just documented. Identified by the 2026-04-21 Sprint 0 infrastructure review §5.
+  - **Runnable in Sprint 2** once TB-02 publishes the orchestrator skeleton.
+  - [src/CMakeLists.txt](../src/CMakeLists.txt) currently links the stub `wildframe` executable against all six static libraries. [docs/ARCHITECTURE.md §1](ARCHITECTURE.md) specifies the entry point depends only on `wildframe::orchestrator` and `wildframe::metadata` (plus `wildframe::log`); the other four are indirect. After TB-02 lands, remove the direct links to `wildframe::ingest`, `wildframe::raw`, `wildframe::detect`, `wildframe::focus` so the module boundary is enforced by the build, not just documented. Identified by the 2026-04-21 Sprint 0 infrastructure review §5.
 
 ---
 
 ## Integration / Validation
 
-- [ ] **I-01** — End-to-end smoke test
+- [ ] **I-01** — GUI end-to-end smoke test
   - Deps: M6-07, M7-08
   - Size: S
   - Satisfies: §16 (MVP readiness)
-  - Run the GUI on all S0-12 fixtures. Verify sidecars, manifest, and filterability.
+  - GUI-side counterpart to TB-09. Run the GUI on all S0-12 fixtures. Verify sidecars, manifest, filterability, and that GUI overrides round-trip through `wildframe_metadata`. The CLI-side end-to-end smoke is TB-09 and must remain green alongside.
 
 - [ ] **I-02** — Performance benchmark on Intel Mac
   - Deps: I-01

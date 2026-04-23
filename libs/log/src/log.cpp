@@ -38,7 +38,7 @@ constexpr std::array<std::string_view, 7> kModuleTags = {
 
 }  // namespace
 
-void init(const Config& cfg) {
+void Init(const Config& cfg) {
   spdlog::drop_all();
 
   std::vector<spdlog::sink_ptr> sinks;
@@ -71,7 +71,7 @@ void init(const Config& cfg) {
   }
 }
 
-void shutdown() noexcept { spdlog::drop_all(); }
+void Shutdown() noexcept { spdlog::drop_all(); }
 
 namespace detail {
 
@@ -101,7 +101,7 @@ spdlog::logger* native(const Logger& handle) noexcept {
   }
 
   // Reaching here means `spdlog::get` returned null: either
-  // `wildframe::log::init()` has not run, or the handle's tag is not
+  // `wildframe::log::Init()` has not run, or the handle's tag is not
   // in `docs/STYLE.md` §4.5 — both programming errors. Terminate
   // loudly rather than silently log into the void.
   (void)std::fputs("wildframe::log: no logger registered for tag '", stderr);
@@ -109,7 +109,7 @@ spdlog::logger* native(const Logger& handle) noexcept {
   // so write the bytes directly.
   (void)std::fwrite(tag.data(), 1, tag.size(), stderr);
   (void)std::fputs(
-      "'. Did wildframe::log::init() run, and is the handle tag one "
+      "'. Did wildframe::log::Init() run, and is the handle tag one "
       "of those in docs/STYLE.md \xC2\xA7"
       "4.5?\n",
       stderr);
