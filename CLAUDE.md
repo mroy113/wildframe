@@ -25,6 +25,10 @@ C++ desktop application that analyzes folders of RAW bird photographs and writes
 | XMP field names and types | `docs/METADATA.md` |
 | Code style, exception policy, Core Guidelines vs Google conflicts | `docs/STYLE.md` |
 | Qt LGPL and model-weight licensing | `docs/LICENSING.md` |
+| Runtime TOML config keys and defaults | `docs/CONFIG.md` |
+| Test fixture catalog and provenance | `docs/FIXTURES.md` |
+| Local dev environment setup (toolchain, vcpkg, presets) | `docs/DEV_SETUP.md` |
+| Project overview for new contributors | `README.md` |
 | What to work on next | `docs/BACKLOG.md` |
 | Branching, PR, commit conventions | `CONTRIBUTING.md` |
 

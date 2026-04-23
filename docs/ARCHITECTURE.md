@@ -19,7 +19,7 @@ the extension point they will plug into is relevant.
 
 ## 1. Module dependency graph
 
-Seven targets make up the MVP: six static libraries (`libs/*/`) and
+Eight targets make up the MVP: seven static libraries (`libs/*/`) and
 one GUI executable (`src/`). Headers are the only coupling — every
 edge below corresponds to a `target_link_libraries(... PRIVATE ...)`
 or `... PUBLIC ...` edge that exposes a type across the API boundary.
@@ -33,17 +33,25 @@ graph TD
     detect[wildframe_detect]
     focus[wildframe_focus]
     metadata[wildframe_metadata]
+    log[wildframe_log]
 
     gui --> orch
     gui --> metadata
+    gui --> log
 
     orch --> ingest
     orch --> raw
     orch --> detect
     orch --> focus
     orch --> metadata
+    orch --> log
 
     detect --> raw
+    ingest --> log
+    raw --> log
+    detect --> log
+    focus --> log
+    metadata --> log
     focus --> raw
 ```
 
@@ -86,7 +94,8 @@ detail:
 | `wildframe_detect` | ONNX Runtime | `wildframe::detect::DetectError` |
 | `wildframe_focus` | OpenCV | `wildframe::focus::FocusError` |
 | `wildframe_metadata` | Exiv2 | `wildframe::metadata::MetadataError` |
-| `wildframe_orchestrator` | nlohmann/json, spdlog | `wildframe::orchestrator::OrchestratorError` |
+| `wildframe_orchestrator` | nlohmann/json | `wildframe::orchestrator::OrchestratorError` |
+| `wildframe_log` | spdlog | (aborts on programming errors; `spdlog::spdlog_ex` on sink open — translated at the orchestrator boundary) |
 | `wildframe` (GUI) | Qt 6 Widgets, tomlplusplus | (GUI boundary — surfaces in the UI) |
 
 ---
@@ -166,6 +175,20 @@ marshals progress back via Qt signals, per the handoff §5 threading
 strategy. Reads XMP sidecars directly (via `wildframe_metadata`)
 for filtering and display so the detail view does not require a
 running batch (FR-6, FR-8, FR-9, FR-10).
+
+### `wildframe_log` (Module 8)
+
+Sole owner of spdlog. Exposes one constexpr `Logger` handle per
+module tag from `docs/STYLE.md` §4.5 and a single `Init()` entry
+point the orchestrator calls once at startup with the TOML-resolved
+sink config (log path, level, rotation). Every other module logs
+through `wildframe::log::<tag>.info(...)` (function API) or the
+`WF_TRACE` / `WF_DEBUG` macros (compile-time-strippable via
+`SPDLOG_ACTIVE_LEVEL`) — no module links spdlog directly. The
+handles are stateless: each call resolves to the registered
+`spdlog::logger` by tag and aborts loudly if the registry is empty
+or the tag is unknown, which can only be a programming error
+(S0-14, NFR-5 auditability).
 
 ---
 
@@ -385,9 +408,10 @@ legitimate bypasses, documented here so future contributors do not
 - **CMake configure → `tools/fetch_models.cmake`** to download
   ONNX weights. Not part of any module — a build-system concern
   (handoff §11, S0-11).
-- **Every module → spdlog** directly. The logging sink is a
-  process-global initialized once at startup (S0-14); it is not an
-  orchestrator responsibility.
+- **Every module → `wildframe_log`** for log output. The logging
+  sink is a process-global initialized once at startup (S0-14); it
+  is not an orchestrator responsibility. `wildframe_log` is the
+  sole owner of spdlog — no other module links it directly.
 - **Every module → `tomlplusplus` config** indirectly through the
   strongly-typed config structs they receive (`DetectConfig`,
   `FocusConfig`, …). Modules do not parse TOML themselves; the GUI
