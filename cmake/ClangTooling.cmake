@@ -24,32 +24,6 @@ if(CMAKE_CXX_CLANG_TIDY)
 endif()
 
 # ---------------------------------------------------------------------------
-# Per-test-target clang-tidy overrides (docs/STYLE.md §2.13).
-#
-# A few clang-tidy checks do not model gtest-specific idioms — forcing
-# `private:` + accessor pairs on every fixture, or the cognitive-complexity
-# inflation from EXPECT_*/ASSERT_* macro expansion. Rather than restructure
-# every test for those two checks, disable them on test targets only.
-#
-# Mechanism: override the target's CXX_CLANG_TIDY to the same exe but with
-# extra `--checks=-foo,-bar` args. clang-tidy merges `--checks` with the
-# ancestor-discovered `.clang-tidy` config, so production code under
-# libs/<module>/src/ and libs/<module>/include/ still runs the full set.
-#
-# Call `wildframe_apply_tests_tidy_config(<target>)` immediately after
-# `add_executable` in each `libs/<module>/tests/CMakeLists.txt`. This is
-# the single source of truth — update the list here, not per directory.
-function(wildframe_apply_tests_tidy_config target)
-    if(NOT CMAKE_CXX_CLANG_TIDY)
-        return()
-    endif()
-    set_target_properties(${target} PROPERTIES
-        CXX_CLANG_TIDY
-            "${WILDFRAME_CLANG_TIDY_EXECUTABLE};--checks=-cppcoreguidelines-non-private-member-variables-in-classes,-misc-non-private-member-variables-in-classes,-readability-function-cognitive-complexity"
-    )
-endfunction()
-
-# ---------------------------------------------------------------------------
 # clang-format (S0-05). `format` applies clang-format in place; `format-check`
 # verifies no drift and is the CI gate per NFR-7. Both operate on every C++
 # source file under libs/, src/, and tests/. If clang-format is absent, the

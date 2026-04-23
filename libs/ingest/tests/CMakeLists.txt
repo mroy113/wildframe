@@ -1,7 +1,6 @@
 add_executable(wildframe_ingest_test
     enumerate_test.cpp
 )
-wildframe_apply_tests_tidy_config(wildframe_ingest_test)
 
 target_link_libraries(wildframe_ingest_test
     PRIVATE

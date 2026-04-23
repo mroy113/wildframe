@@ -375,18 +375,27 @@ Concretely:
 
 A few clang-tidy checks do not model gtest-specific idioms. Rather
 than contort every test file to satisfy checks that were never aimed
-at test code, we disable the worst offenders on test executables
-only. Production code under `libs/<module>/src/` and
-`libs/<module>/include/` still runs the full check set.
+at test code, we disable the worst offenders under
+`libs/<module>/tests/` only. Production code under
+`libs/<module>/src/` and `libs/<module>/include/` still runs the full
+check set.
 
-**Mechanism.** A single cmake helper holds the tests-only disable
-list: `wildframe_apply_tests_tidy_config(<target>)` in
-[cmake/ClangTooling.cmake](../cmake/ClangTooling.cmake). Every test
-`CMakeLists.txt` calls it once, right after `add_executable`. The
-helper overrides the target's `CXX_CLANG_TIDY` to add
-`--checks=-foo,-bar,...` on top of the repo-root `.clang-tidy`.
-There is exactly one place to update the disable list; no per-test
-config files.
+**Mechanism.** The repo-root `.clang-tidy` defines the full check
+set. A single overrides file at
+[cmake/clang-tidy-tests.yaml](../cmake/clang-tidy-tests.yaml)
+disables the two checks below via `InheritParentConfig: true` plus a
+short `Checks:` list. Every `libs/<module>/tests/.clang-tidy` is a
+symlink to that one file, so `clang-tidy`'s ancestor-walk discovery
+picks up the same overrides for every test source — whether invoked
+by the `tidy` cmake preset or by `run-clang-tidy` reading
+`compile_commands.json` directly (the latter is how CI runs). There
+is exactly one file of content to update.
+
+When you add a new test directory, create the symlink:
+
+```bash
+ln -s ../../../cmake/clang-tidy-tests.yaml libs/<module>/tests/.clang-tidy
+```
 
 **Disabled on test targets:**
 

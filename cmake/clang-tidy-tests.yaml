@@ -1,0 +1,30 @@
+# Tests-only clang-tidy overrides. See docs/STYLE.md §2.13.
+#
+# This file is the single source of truth. Each libs/<module>/tests/
+# directory has a symlink `.clang-tidy` → ../../../cmake/clang-tidy-tests.yaml,
+# which `clang-tidy`'s ancestor-walk discovery picks up for every test
+# source. Update this file and every test target sees the change.
+#
+# `InheritParentConfig: true` means the repo-root .clang-tidy's full
+# check set still applies — we only disable the two checks below on
+# top of it.
+#
+# Disabled on test files only:
+#   - cppcoreguidelines-non-private-member-variables-in-classes (+alias)
+#       Gtest fixtures put shared state in `protected:` so TEST_F bodies
+#       (which derive the fixture) can reach it. Forcing `private:` +
+#       protected accessor pairs on every fixture is pure ceremony.
+#   - readability-function-cognitive-complexity
+#       EXPECT_*/ASSERT_* expand to nested switch/if, so a linear
+#       "check every element" loop trips the default threshold (25)
+#       with four or more assertions.
+#
+# To add a new test directory: create the symlink with
+#   ln -s ../../../cmake/clang-tidy-tests.yaml libs/<module>/tests/.clang-tidy
+
+InheritParentConfig: true
+
+Checks: >
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -misc-non-private-member-variables-in-classes,
+  -readability-function-cognitive-complexity
