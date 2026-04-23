@@ -35,8 +35,9 @@
 # retention policy (daily at local midnight, 14 rotations retained).
 log_path = "~/Library/Logs/Wildframe/wildframe.log"
 
-# Threshold for both stdout and file sinks. Allowed values:
-#   "trace", "debug", "info", "warn", "error", "critical"
+# Threshold for both stdout and file sinks. Allowed values match
+# spdlog's canonical names (docs/CONFIG.md §3.1):
+#   "trace", "debug", "info", "warning", "error", "critical"
 # Defaults differ by build preset (docs/STYLE.md §4.2):
 #   release         → "info"
 #   debug / asan    → "debug"

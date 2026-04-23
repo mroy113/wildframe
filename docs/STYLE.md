@@ -555,6 +555,11 @@ a row.
 Both sinks share a level in a given build so a reader never has to
 correlate across sinks to reconstruct what happened. Overridable per
 run via the TOML config key `log_level` (S0-18) for field debugging.
+The config-file strings match spdlog's canonical names
+(`spdlog::level::from_str`) — `warning` and `error` rather than the
+shorter `warn` / `err` C++ method names that appear in code examples
+in this document. See `docs/CONFIG.md` §3.1 for the authoritative
+allowed-values list.
 
 `trace` requires a rebuild: `SPDLOG_ACTIVE_LEVEL` is set at compile
 time to `SPDLOG_LEVEL_DEBUG` for `release` and `SPDLOG_LEVEL_TRACE`

@@ -33,8 +33,10 @@ hit wins; later candidates are not merged.
 1. **CLI:** `wildframe --config <path>` — any path the user names, used
    as-is. A missing file here is a startup error: the user asked for a
    specific file and we should not silently fall through.
-2. **User config:** `$XDG_CONFIG_HOME/wildframe/config.toml`. On macOS,
-   `XDG_CONFIG_HOME` is typically unset; Wildframe falls back to
+2. **User config:** `$XDG_CONFIG_HOME/wildframe/config.toml`.
+   `$XDG_CONFIG_HOME` is the [XDG Base Directory](https://specifications.freedesktop.org/basedir-spec/latest/)
+   per-user config root (typically `~/.config` on Linux). On macOS it
+   is usually unset; Wildframe falls back to
    `~/Library/Application Support/Wildframe/config.toml` in that case,
    matching the Apple-recommended location for per-app user data.
 3. **Built-in default:** the values shipped in [`data/config.default.toml`](../data/config.default.toml).
@@ -112,7 +114,7 @@ adjust the default (and may also widen the range) inside its own PR.
 | Key | Type | Range / allowed values | Default | Satisfies | Locked by | Purpose |
 |---|---|---|---|---|---|---|
 | `log_path` | String (path) | any writable filesystem path | `~/Library/Logs/Wildframe/wildframe.log` | FR-5, FR-11, NFR-5 | S0-19 | spdlog daily-rotating file sink location (see `docs/STYLE.md` §4.3). Parent directories are created on first run. |
-| `log_level` | String (enum) | `trace`, `debug`, `info`, `warn`, `error`, `critical` | `info` in `release` build, `debug` in `debug` / `asan` | NFR-5 | S0-18 | Threshold for both stdout and file sinks. Overrides the build-default in `docs/STYLE.md` §4.2 for field debugging. `trace` requires a debug/asan build — see §4. |
+| `log_level` | String (enum) | `trace`, `debug`, `info`, `warning`, `error`, `critical` | `info` in `release` build, `debug` in `debug` / `asan` | NFR-5 | S0-18 | Threshold for both stdout and file sinks. Values are spdlog's canonical names (`spdlog::level::from_str`, `SPDLOG_LEVEL_NAMES`) — Wildframe delegates the string-to-level mapping to the backend rather than maintaining a parallel table. Overrides the build-default in `docs/STYLE.md` §4.2 for field debugging. `trace` requires a debug/asan build — see §4. |
 | `manifest_dir` | String (path) | any writable filesystem path | `~/Library/Application Support/Wildframe/batches/` | FR-5, FR-11, NFR-5 | S0-19 | Directory where per-batch JSON manifests (M6-05) are written. Each run creates `<ISO-8601-timestamp>.json` inside. Parent directories are created on first run. |
 | `reanalysis_default` | String (enum) | `prompt`, `skip`, `overwrite` | `prompt` | FR-10, FR-11 | S0-21 | Default re-analysis behavior when existing `wildframe:*` sidecars are found. `prompt` shows the GUI dialog (M7-10); `skip` and `overwrite` run headless. |
 

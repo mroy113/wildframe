@@ -269,7 +269,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
 - No worker thread, no job queue, no cancellation. TB-02 is synchronous; M6-02 / M6-03 / M6-08 thicken the orchestrator later.
 - No GUI. Module 7 builds on the already-thickened pipeline.
 
-- [ ] **TB-01** — CLI entry point + TOML config parser
+- [x] **TB-01** — CLI entry point + TOML config parser
   - Deps: S0-03, S0-14, S0-18, S0-19
   - Size: M
   - Satisfies: §3 (delivery), FR-11
