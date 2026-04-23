@@ -371,6 +371,42 @@ Concretely:
   cares about "now" or "where" takes an injected clock or path and
   lets the integration point supply the process-level value.
 
+### 2.13 GoogleTest ↔ clang-tidy interactions
+
+Three clang-tidy checks do not model gtest-specific idioms and will
+trip on otherwise-correct test code. Each has a standard restructure
+per §2.10 "Restructure the call site"; no `NOLINT` is needed.
+
+- **`bugprone-unchecked-optional-access` does not follow `ASSERT_TRUE`.**
+  The checker's dataflow analysis cannot see through gtest's
+  aborts-the-caller macro contract, so an `ASSERT_TRUE(opt.has_value())`
+  followed by `*opt` still trips. Pair the assertion with a plain
+  `if (opt.has_value())` around the dereference:
+  ```cpp
+  ASSERT_TRUE(job.size_bytes.has_value());
+  if (job.size_bytes.has_value()) {
+    EXPECT_GT(*job.size_bytes, 0U);
+  }
+  ```
+
+- **`cppcoreguidelines-non-private-member-variables-in-classes` flags
+  `protected:` fixture members.** Idiomatic gtest puts shared fixture
+  state in `protected:` so test bodies (which derive the fixture)
+  can reach it, but the check treats every non-`private` member as
+  encapsulation debt. Put the member in `private:` and expose a
+  `protected: [[nodiscard]] const T& name() const` accessor; test
+  bodies call `name()`, fixture methods keep direct access to the
+  underlying member.
+
+- **`readability-function-cognitive-complexity` trips on test bodies
+  with ~4+ `EXPECT_*`/`ASSERT_*` inside a loop.** Each macro expands
+  to a nested switch/if that adds to the score, so a straightforward
+  "check every element" loop can exceed the default threshold (25).
+  Extract a free `void VerifyX(const T&)` helper in the anonymous
+  namespace and call it from the loop body. `ASSERT_*` from a helper
+  aborts the helper, not the test — that is the documented gtest
+  contract and is fine for field-by-field checks.
+
 ---
 
 ## 3. Exception policy
