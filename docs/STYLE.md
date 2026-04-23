@@ -371,6 +371,65 @@ Concretely:
   cares about "now" or "where" takes an injected clock or path and
   lets the integration point supply the process-level value.
 
+### 2.13 GoogleTest ↔ clang-tidy interactions
+
+A few clang-tidy checks do not model gtest-specific idioms. Rather
+than contort every test file to satisfy checks that were never aimed
+at test code, we disable the worst offenders under
+`libs/<module>/tests/` only. Production code under
+`libs/<module>/src/` and `libs/<module>/include/` still runs the full
+check set.
+
+**Mechanism.** The repo-root `.clang-tidy` defines the full check
+set. A single overrides file at
+[cmake/clang-tidy-tests.yaml](../cmake/clang-tidy-tests.yaml)
+disables the two checks below via `InheritParentConfig: true` plus a
+short `Checks:` list. Every `libs/<module>/tests/.clang-tidy` is a
+symlink to that one file, so `clang-tidy`'s ancestor-walk discovery
+picks up the same overrides for every test source — whether invoked
+by the `tidy` cmake preset or by `run-clang-tidy` reading
+`compile_commands.json` directly (the latter is how CI runs). There
+is exactly one file of content to update.
+
+When you add a new test directory, create the symlink:
+
+```bash
+ln -s ../../../cmake/clang-tidy-tests.yaml libs/<module>/tests/.clang-tidy
+```
+
+**Disabled on test targets:**
+
+- `cppcoreguidelines-non-private-member-variables-in-classes` and
+  its alias `misc-non-private-member-variables-in-classes`.
+  Idiomatic gtest fixtures put shared state in `protected:` so
+  derived `TEST_F` bodies can reach it; the check treats every
+  non-`private` member as encapsulation debt. Forcing `private:` +
+  `protected:` accessor pairs on every fixture is ceremony that no
+  reader benefits from.
+- `readability-function-cognitive-complexity`. Each
+  `EXPECT_*`/`ASSERT_*` expands to a nested switch/if that adds to
+  the score, so a straightforward "check every element" loop
+  exceeds the default threshold of 25 with four or more assertions.
+  Rather than extract helpers purely to appease the expansion, let
+  test bodies stay linear.
+
+**Still enforced — with a documented workaround:**
+
+- `bugprone-unchecked-optional-access` does not follow `ASSERT_TRUE`.
+  The checker's dataflow analysis cannot see through gtest's
+  aborts-the-caller macro contract, so an
+  `ASSERT_TRUE(opt.has_value())` followed by `*opt` still trips.
+  This one is kept because the failure mode (dereferencing an empty
+  optional) is a real bug class outside gtest too. Pair the
+  assertion with a plain `if (opt.has_value())` around the
+  dereference:
+  ```cpp
+  ASSERT_TRUE(job.size_bytes.has_value());
+  if (job.size_bytes.has_value()) {
+    EXPECT_GT(*job.size_bytes, 0U);
+  }
+  ```
+
 ---
 
 ## 3. Exception policy

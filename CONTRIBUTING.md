@@ -62,7 +62,7 @@ Every PR must include:
 - Build: debug + release presets.
 - Tests: `ctest` full suite.
 - Format: clang-format clean.
-- Static analysis: `clang-tidy` zero findings, no new unexplained suppressions.
+- Static analysis: `clang-tidy` zero findings, no new unexplained suppressions. For a faster per-module loop than the full `tidy` preset, see [docs/DEV_SETUP.md §8](docs/DEV_SETUP.md#8-notes-and-known-footguns) — Homebrew LLVM needs an explicit `-isysroot` to avoid bogus `'filesystem' file not found` errors.
 - No committed model weights, no committed build artifacts.
 
 ### Merge policy

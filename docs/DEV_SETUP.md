@@ -166,3 +166,22 @@ locally is the minimum before opening a PR.
   script refuses to check out a new SHA in a dirty vcpkg tree. Commit,
   stash, or point `VCPKG_ROOT` at a different directory before
   re-running.
+- **Direct `run-clang-tidy` needs an explicit macOS SDK sysroot.**
+  The `cmake --build --preset tidy` gate passes the right flags for
+  you. If you need to iterate on one module without rebuilding the
+  whole tree, `run-clang-tidy` is faster — but Homebrew LLVM does
+  not auto-discover the Xcode SDK the way Apple Clang does, so
+  `/usr/local/opt/llvm/bin/run-clang-tidy -p build/debug libs/<module>`
+  fails with spurious `'filesystem' file not found` cascades. Copy
+  the CI flags:
+  ```bash
+  SDK_PATH="$(xcrun --show-sdk-path)"
+  /usr/local/opt/llvm/bin/run-clang-tidy -p build/debug \
+    -clang-tidy-binary /usr/local/opt/llvm/bin/clang-tidy \
+    -extra-arg=-isysroot"${SDK_PATH}" -quiet libs/<module>
+  ```
+  This mirrors [.github/workflows/ci.yml](../.github/workflows/ci.yml)
+  so a local pass matches the CI gate exactly — including the
+  tests-only check overrides (see [docs/STYLE.md §2.13](STYLE.md)),
+  which `run-clang-tidy` discovers via the `.clang-tidy` symlink
+  in every `libs/<module>/tests/` directory.
