@@ -493,7 +493,7 @@ This document is ready to be decomposed into development tasks. The planning age
 
 1. Produce a per-module task breakdown aligned with the seven MVP modules in Section 10.
 2. Define module-level acceptance criteria tied to the FRs in Section 8 and NFRs in Section 9.
-3. Identify the critical path: `wildframe_ingest` → `wildframe_raw` → `wildframe_detect` → `wildframe_focus` → `wildframe_metadata` → `wildframe_orchestrator` → `wildframe_gui`.
+3. Sequence implementation as a **tracer bullet** (Section 18), not per-module bottom-up. The end-to-end CLI slice lands before any stage receives its real implementation; stages are then thickened one at a time while keeping the end-to-end smoke test green. The original bottom-up critical path (`wildframe_ingest` → `wildframe_raw` → `wildframe_detect` → `wildframe_focus` → `wildframe_metadata` → `wildframe_orchestrator` → `wildframe_gui`) is retained only as the module *dependency* graph, not as the implementation order.
 4. Schedule **Sprint 0** tasks before any module work:
    - Pitchfork directory scaffold (Section 11).
    - `vcpkg.json` manifest with pinned versions of LibRaw, Exiv2, OpenCV, ONNX Runtime, Qt 6, nlohmann/json, tomlplusplus, spdlog, GoogleTest.
@@ -508,3 +508,25 @@ This document is ready to be decomposed into development tasks. The planning age
 5. Treat YOLOv11 ONNX export URL + SHA256 + licensing confirmation as a prerequisite for `wildframe_detect`.
 6. Schedule a benchmark task at the end of MVP to validate the Section 9 performance targets on both Intel and Apple Silicon.
 7. Every task's Definition of Done must include: clang-format clean, clang-tidy zero-findings, GoogleTest coverage for public interfaces, and conformance to `docs/STYLE.md`.
+
+---
+
+## 18. Implementation Sequencing — Tracer-Bullet First
+
+MVP is sequenced as a **tracer bullet** (vertical slice), not a per-module waterfall.
+
+1. **Skeleton slice.** A CLI entry point drives the full pipeline end-to-end on real CR3 inputs. Expensive stages (`wildframe_raw`, `wildframe_detect`, `wildframe_focus`, and the `wildframe:`/`wildframe_user:` XMP namespace writes) ship as **stubs** that satisfy their public headers with sentinel returns. Cheap stages (`wildframe_ingest`, orchestrator skeleton, XMP provenance-only write, minimal batch manifest) ship real. At the end of the slice, one command produces a valid sidecar + manifest row for every S0-12 fixture.
+
+2. **Thickening passes.** Each stub is replaced by its real implementation one at a time, in whatever order pays off the most signal — typically `wildframe_raw` first (unblocks real pixel data), then `wildframe_detect`, `wildframe_focus`, and full metadata writes. The end-to-end smoke test must stay green across every replacement; a thickening that regresses it is not ready.
+
+3. **GUI layer.** Module 7 builds on top of the thickened pipeline. The CLI persists alongside the GUI as a genuine long-term entry point for headless and automated use — FR-10's `reanalysis_default` and FR-11's runtime config already scope that use.
+
+### Constraints this does not relax
+
+- **A stub is not a TODO.** It lives behind the same public interface the real implementation will satisfy, ships with the same Doxygen, tidies clean under the same check set, and is covered by tests that assert the sentinel behavior. Definition of Done (CLAUDE.md §4) applies in full.
+- **`docs/STYLE.md §2.11` ("Do not ship speculative interface surface") is not violated.** §2.11 forbids exported surface whose only caller is a future task; tracer-bullet stubs have a live caller (the CLI) from the moment they ship.
+- **Scope does not widen.** The stubs cover exactly the seven MVP modules. Phase 2+ work (species, eye detection, Lightroom) remains out of scope per §6.
+
+### Why this shape
+
+Solo contributor + a pipeline with real interface unknowns (ONNX output shapes, focus-metric return types, XMP round-trip quirks under Exiv2). The coordination benefit that justifies stabilizing inter-module contracts before integration does not apply to one maintainer, and the end-to-end slice surfaces interface surprises inside each sprint rather than at a big-bang integration after Module 6.

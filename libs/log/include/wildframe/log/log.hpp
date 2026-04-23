@@ -42,7 +42,7 @@
 
 namespace wildframe::log {
 
-/// `init()` input. The orchestrator builds one of these from the
+/// `Init()` input. The orchestrator builds one of these from the
 /// TOML config (`log_path`, `log_level`) and passes it in.
 struct Config {
   /// Threshold applied to every module logger (`docs/STYLE.md` §4.2).
@@ -76,7 +76,7 @@ namespace detail {
 
 /// Resolve a handle to its registered spdlog logger. Terminates if
 /// the tag is not registered: a missing tag means either
-/// `wildframe::log::init()` has not run or the handle's tag is not in
+/// `wildframe::log::Init()` has not run or the handle's tag is not in
 /// `docs/STYLE.md` §4.5 — both programming errors, not runtime
 /// conditions.
 [[nodiscard]] spdlog::logger* native(const Logger& handle) noexcept;
@@ -133,11 +133,11 @@ class Logger {
 /// Throws `spdlog::spdlog_ex` if the file sink cannot be opened. The
 /// orchestrator translates that to a Wildframe error type at the
 /// boundary (`docs/STYLE.md` §3.1).
-void init(const Config& cfg);
+void Init(const Config& cfg);
 
 /// Drop every Wildframe-registered logger. Production code rarely
 /// needs this; tests call it between cases to keep state isolated.
-void shutdown() noexcept;
+void Shutdown() noexcept;
 
 // One handle per `docs/STYLE.md` §4.5 tag. `inline constexpr` gives
 // external linkage with ODR safety — every translation unit sees the
