@@ -14,16 +14,13 @@
 // narrowing, or invariant addition to justify the maintenance
 // surface).
 // NOLINTBEGIN(misc-include-cleaner)
-#include <toml++/toml.hpp>
-
-#include <array>
-#include <algorithm>
 #include <filesystem>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <toml++/toml.hpp>
 #include <unordered_map>
 
 #include "wildframe/orchestrator/paths.hpp"
@@ -31,8 +28,6 @@
 namespace wildframe::cli {
 
 namespace {
-
-namespace wfo = ::wildframe::orchestrator;
 
 // User-config filename under the XDG / macOS config directory. Fixed
 // by `docs/CONFIG.md` §1.2 step 2.
@@ -45,16 +40,6 @@ constexpr std::string_view kUserConfigSubdir = "wildframe";
 constexpr std::string_view kMacConfigRelative =
     "Library/Application Support/Wildframe";
 
-// Only key names with a live TB-01 consumer are parsed. Any other
-// top-level key or any table triggers the §1.5 unknown-key rejection
-// — each module's thickening pass widens this set.
-constexpr std::array<std::string_view, 4> kAllowedTopLevelKeys = {
-    "log_path",
-    "log_level",
-    "manifest_dir",
-    "reanalysis_default",
-};
-
 // Compile-time default for `log_level` per `docs/STYLE.md` §4.2:
 // debug / asan → "debug"; release → "info". `NDEBUG` is the standard
 // way CMake's Release config signals release builds.
@@ -65,21 +50,6 @@ constexpr spdlog::level::level_enum kDefaultLogLevel =
     spdlog::level::debug;
 #endif
 
-// Accepted log_level values, in the docs/STYLE.md §4.1 order.
-const std::unordered_map<std::string_view, spdlog::level::level_enum>&
-LogLevelMap() {
-  static const std::unordered_map<std::string_view, spdlog::level::level_enum>
-      kMap{
-          {"trace", spdlog::level::trace},
-          {"debug", spdlog::level::debug},
-          {"info", spdlog::level::info},
-          {"warn", spdlog::level::warn},
-          {"error", spdlog::level::err},
-          {"critical", spdlog::level::critical},
-      };
-  return kMap;
-}
-
 const std::unordered_map<std::string_view, ReanalysisPolicy>&
 ReanalysisPolicyMap() {
   static const std::unordered_map<std::string_view, ReanalysisPolicy> kMap{
@@ -88,12 +58,6 @@ ReanalysisPolicyMap() {
       {"overwrite", ReanalysisPolicy::kOverwrite},
   };
   return kMap;
-}
-
-[[nodiscard]] bool IsAllowedTopLevelKey(std::string_view key) {
-  return std::ranges::any_of(
-      kAllowedTopLevelKeys,
-      [key](std::string_view allowed) { return key == allowed; });
 }
 
 [[nodiscard]] std::filesystem::path ExpandPathValue(
@@ -109,7 +73,8 @@ ReanalysisPolicyMap() {
       throw ConfigError{msg.str()};
     }
   }
-  return wfo::ExpandTilde(std::filesystem::path{raw_value}, home);
+  return wildframe::orchestrator::ExpandTilde(std::filesystem::path{raw_value},
+                                              home);
 }
 
 [[nodiscard]] std::string RequireStringValue(const toml::node& node,
@@ -137,16 +102,20 @@ void ApplyManifestDir(const toml::node& node, const std::filesystem::path& home,
 
 void ApplyLogLevel(const toml::node& node, Config& out) {
   const auto raw = RequireStringValue(node, "log_level");
-  const auto& map = LogLevelMap();
-  if (const auto entry = map.find(raw); entry != map.end()) {
-    out.log_level = entry->second;
-    return;
+  // Delegate the string-to-level mapping to spdlog itself — we use
+  // spdlog's canonical names (`warning`, `error`, ...) per
+  // docs/CONFIG.md §3.1. `from_str` returns `off` on any unknown
+  // input; we also reject an explicit `"off"` because silencing
+  // logs entirely would undermine the NFR-5 audit trail.
+  const auto level = spdlog::level::from_str(raw);
+  if (level == spdlog::level::off) {
+    std::ostringstream msg;
+    msg << "config key 'log_level' has invalid value '" << raw
+        << "'; expected one of: trace, debug, info, warning, error, critical "
+           "(docs/CONFIG.md §3.1)";
+    throw ConfigError{msg.str()};
   }
-  std::ostringstream msg;
-  msg << "config key 'log_level' has invalid value '" << raw
-      << "'; expected one of: trace, debug, info, warn, error, critical "
-         "(docs/CONFIG.md §3.1)";
-  throw ConfigError{msg.str()};
+  out.log_level = level;
 }
 
 void ApplyReanalysisDefault(const toml::node& node, Config& out) {
@@ -164,18 +133,13 @@ void ApplyReanalysisDefault(const toml::node& node, Config& out) {
 
 void ApplyUserConfig(const toml::table& tbl, const std::filesystem::path& home,
                      Config& out) {
+  // The if-chain is the single source of truth for recognized keys.
+  // Any TOML entry that does not match a branch falls into the
+  // unknown-key rejection below (docs/CONFIG.md §1.5). When a module
+  // thickens its config surface (M1-02 done; M3-*, M4-*), that PR
+  // adds a branch here in the same commit that parses its table.
   for (const auto& [raw_key, node] : tbl) {
     const std::string_view key{raw_key.str()};
-
-    if (!IsAllowedTopLevelKey(key)) {
-      std::ostringstream msg;
-      msg << "config has unknown key '" << key
-          << "' — typos fail loudly (docs/CONFIG.md §1.5). Only "
-             "log_path, log_level, manifest_dir, reanalysis_default "
-             "are recognized in the current build; [ingest], [detect], "
-             "and [focus] tables land with their owning module tasks.";
-      throw ConfigError{msg.str()};
-    }
 
     if (key == "log_path") {
       ApplyLogPath(node, home, out);
@@ -185,6 +149,14 @@ void ApplyUserConfig(const toml::table& tbl, const std::filesystem::path& home,
       ApplyManifestDir(node, home, out);
     } else if (key == "reanalysis_default") {
       ApplyReanalysisDefault(node, out);
+    } else {
+      std::ostringstream msg;
+      msg << "config has unknown key '" << key
+          << "' — typos fail loudly (docs/CONFIG.md §1.5). Only "
+             "log_path, log_level, manifest_dir, reanalysis_default "
+             "are recognized in the current build; [ingest], [detect], "
+             "and [focus] tables land with their owning module tasks.";
+      throw ConfigError{msg.str()};
     }
   }
 }
@@ -199,7 +171,7 @@ std::optional<std::filesystem::path> ResolveConfigPath(
     // Tilde-expand per docs/CONFIG.md §1.3, then require existence:
     // "used as-is. A missing file here is a startup error". Kept
     // non-const so the value moves out on return.
-    auto expanded = wfo::ExpandTilde(*cli_override, home);
+    auto expanded = wildframe::orchestrator::ExpandTilde(*cli_override, home);
     if (expanded.string().starts_with('~')) {
       throw ConfigError{
           "--config path uses '~' but $HOME is unset or empty "
@@ -246,14 +218,13 @@ Config BuiltInDefaults(const std::filesystem::path& home) {
         "$HOME is unset or empty; cannot resolve default log_path or "
         "manifest_dir (docs/CONFIG.md §5)"};
   }
-  out.log_path = wfo::DefaultLogPath(home);
-  out.manifest_dir = wfo::DefaultManifestDir(home);
+  out.log_path = wildframe::orchestrator::DefaultLogPath(home);
+  out.manifest_dir = wildframe::orchestrator::DefaultManifestDir(home);
   return out;
 }
 
-Config LoadConfig(
-    const std::optional<std::filesystem::path>& user_config_path,
-    const std::filesystem::path& home) {
+Config LoadConfig(const std::optional<std::filesystem::path>& user_config_path,
+                  const std::filesystem::path& home) {
   Config out = BuiltInDefaults(home);
 
   if (!user_config_path.has_value()) {

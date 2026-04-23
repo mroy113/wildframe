@@ -100,17 +100,26 @@ TEST_F(ConfigTest, LoadConfigManifestDirOverride) {
 }
 
 TEST_F(ConfigTest, LoadConfigLogLevelOverride) {
-  const auto file = WriteToml("log_level = \"warn\"\n");
+  // spdlog's canonical name for the warn level is "warning"
+  // (SPDLOG_LEVEL_NAMES in spdlog/common.h). docs/CONFIG.md §3.1
+  // lists the spdlog spellings verbatim.
+  const auto file = WriteToml("log_level = \"warning\"\n");
   const auto cfg = cli::LoadConfig(file, home_);
   EXPECT_EQ(cfg.log_level, spdlog::level::warn);
 }
 
 TEST_F(ConfigTest, LoadConfigLogLevelErrorMapsToSpdlogErr) {
-  // docs/STYLE.md §4.1 spells the level "error"; spdlog's enum names
-  // it `err`. The mapping goes through the string form both ways.
   const auto file = WriteToml("log_level = \"error\"\n");
   const auto cfg = cli::LoadConfig(file, home_);
   EXPECT_EQ(cfg.log_level, spdlog::level::err);
+}
+
+TEST_F(ConfigTest, LoadConfigLogLevelOffRejected) {
+  // spdlog accepts "off" but Wildframe does not — silencing all logs
+  // would defeat the NFR-5 audit trail, and it is not in
+  // docs/CONFIG.md §3.1's allowed list.
+  const auto file = WriteToml("log_level = \"off\"\n");
+  EXPECT_THROW((void)cli::LoadConfig(file, home_), cli::ConfigError);
 }
 
 TEST_F(ConfigTest, LoadConfigReanalysisDefaultOverride) {
