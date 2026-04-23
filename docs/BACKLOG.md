@@ -166,6 +166,18 @@ Ordered task decomposition for Wildframe MVP. Each task is atomic, has explicit 
   - Satisfies: §15 (risks, licensing posture)
   - Per [docs/LICENSING.md §1.1](LICENSING.md), the GPL-3.0-or-later decision is recorded in prose but not machine-readable. Add the full GPL-3.0-or-later license text at repo root as `LICENSE`, and set `"license": "GPL-3.0-or-later"` in `vcpkg.json` (currently `null`). Identified by the 2026-04-21 Sprint 0 infrastructure review §5.
 
+- [x] **S0-23** — ARCHITECTURE.md catch-up for `wildframe_log`
+  - Deps: S0-14
+  - Size: S
+  - Satisfies: NFR-6 (doc/code coupling — architecture doc is the entry point for new contributors)
+  - S0-14 landed `wildframe_log` as an 8th module (sole owner of spdlog), but [docs/ARCHITECTURE.md](ARCHITECTURE.md) still described seven modules, attributed spdlog to `wildframe_orchestrator` in the boundary table, and §6 told every module to use spdlog directly. Update the mermaid graph, boundary table, §2 module-purpose list, and §6 out-of-band paragraph to reflect the indirection. Identified by the 2026-04-23 main-state review §1.
+
+- [x] **S0-24** — CLAUDE.md "Where to find things" table catch-up
+  - Deps: S0-12, S0-15, S0-16, S0-18
+  - Size: S
+  - Satisfies: NFR-6 (discoverability — CLAUDE.md is the first file agents read)
+  - [docs/CONFIG.md](CONFIG.md) (S0-18), [docs/FIXTURES.md](FIXTURES.md) (S0-12), [docs/DEV_SETUP.md](DEV_SETUP.md) (S0-15), and [README.md](../README.md) (S0-16) all landed without being added to the [CLAUDE.md](../CLAUDE.md) §2 table. Add one row per doc. Identified by the 2026-04-23 main-state review §1.
+
 ---
 
 ## Sprint 1 — Infrastructure follow-ups
