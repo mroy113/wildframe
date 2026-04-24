@@ -294,7 +294,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Links `src/` against `wildframe::orchestrator` (+ `wildframe::log` + `wildframe::metadata`); the direct links to ingest/raw/detect/focus in [src/CMakeLists.txt](../src/CMakeLists.txt) become transitive. M7-11 closes this cleanup.
   - Error isolation is **not** wired yet — a stage exception propagates out of `Run` and aborts the CLI. M6-04 catches them and writes manifest rows.
 
-- [ ] **TB-03** — Stub `wildframe_raw` preview/decode
+- [x] **TB-03** — Stub `wildframe_raw` preview/decode
   - Deps: TB-02
   - Size: S
   - **Introduces** the public `PreviewImage` type in `libs/raw/include/wildframe/raw/preview_image.hpp` — the output type of every raw-decode operation and the input type of `wildframe_detect` / `wildframe_focus`. Shape: `{int width, int height, std::vector<std::uint8_t> rgb_bytes}` or similar. Value type, Rule of Zero (STYLE §2.5).

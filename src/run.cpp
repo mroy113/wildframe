@@ -18,6 +18,7 @@
 #include "wildframe/log/log.hpp"
 #include "wildframe/orchestrator/orchestrator.hpp"
 #include "wildframe/orchestrator/pipeline_stage.hpp"
+#include "wildframe/raw/raw_stage.hpp"
 
 namespace wildframe::cli {
 
@@ -101,10 +102,11 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
     return kExitRuntime;
   }
 
-  // Stage list is empty in the Sprint 2 skeleton — TB-03..TB-07 hand
-  // their stubs in from their owning modules, each widening this
-  // vector by one entry. `Run` then iterates them per-job.
+  // Stage list grows one entry per tracer-bullet stub as
+  // TB-03..TB-07 land. TB-03 adds the raw preview stage; subsequent
+  // tasks append their own stages in the same pattern.
   std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
+  stages.push_back(wildframe::raw::MakeRawStage());
   wildframe::orchestrator::Orchestrator orch(std::move(stages),
                                              cfg.manifest_dir);
 
