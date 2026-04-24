@@ -4,12 +4,20 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <ostream>
+#include <utility>
+#include <vector>
 
 #include "cli_args.hpp"
 #include "config.hpp"
+#include "wildframe/ingest/enumerate.hpp"
+#include "wildframe/ingest/image_job.hpp"
+#include "wildframe/ingest/ingest_error.hpp"
 #include "wildframe/log/log.hpp"
+#include "wildframe/orchestrator/orchestrator.hpp"
+#include "wildframe/orchestrator/pipeline_stage.hpp"
 
 namespace wildframe::cli {
 
@@ -85,11 +93,30 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
                                     args.directory.string(),
                                     cfg.manifest_dir.string());
 
-  // TB-02 wires the orchestrator here: construct the stage list,
-  // hand over `cfg.manifest_dir` and the ingest enumeration of
-  // `args.directory`, run the batch synchronously, and translate
-  // per-job exceptions into exit codes per FR-5 / M6-04.
-  (void)args.directory;
+  std::vector<wildframe::ingest::ImageJob> jobs;
+  try {
+    jobs = wildframe::ingest::Enumerate(args.directory);
+  } catch (const wildframe::ingest::IngestError& ingest_error) {
+    err << "wildframe: " << ingest_error.what() << '\n';
+    return kExitRuntime;
+  }
+
+  // Stage list is empty in the Sprint 2 skeleton — TB-03..TB-07 hand
+  // their stubs in from their owning modules, each widening this
+  // vector by one entry. `Run` then iterates them per-job.
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             cfg.manifest_dir);
+
+  try {
+    (void)orch.Run(jobs);
+  } catch (const std::exception& run_error) {
+    // Per-image error isolation is M6-04; until then, a stage
+    // exception aborts the batch and the CLI surfaces it as a
+    // runtime failure.
+    err << "wildframe: " << run_error.what() << '\n';
+    return kExitRuntime;
+  }
 
   return kExitSuccess;
 }
