@@ -77,7 +77,9 @@
       "Bash(git *)",
       "Bash(git)",
       "Bash(gh *)",
-      "Bash(gh)"
+      "Bash(gh)",
+
+      "Bash(ln -s ../../../cmake/clang-tidy-tests.yaml libs/*/tests/.clang-tidy)"
     ]
   }
 }
