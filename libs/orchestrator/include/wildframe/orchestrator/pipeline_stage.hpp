@@ -29,6 +29,7 @@
 #include <optional>
 #include <string_view>
 
+#include "wildframe/detect/detect.hpp"
 #include "wildframe/ingest/image_job.hpp"
 #include "wildframe/raw/preview_image.hpp"
 
@@ -51,6 +52,12 @@ struct StageContext {
   /// (TB-04 / M3-*, TB-05 / M4-*). `std::nullopt` until `RawStage`
   /// runs — dereferencing before that is a programming error.
   std::optional<raw::PreviewImage> preview;
+
+  /// Detector output from `wildframe_detect::Detect`, populated by
+  /// `DetectStage` (TB-04) and consumed by `FocusStage` (TB-05) and
+  /// `MetadataWriteStage` (TB-07 / M5-08). `std::nullopt` until
+  /// `DetectStage` runs.
+  std::optional<detect::DetectionResult> detection;
 };
 
 /// Per-stage return value. Empty in the Sprint 2 skeleton: stages
