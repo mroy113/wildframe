@@ -314,7 +314,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Publishes a `DetectStage : PipelineStage` in `libs/detect/src/detect_stage.cpp`.
   - Tests pin the sentinel return. Replaced by M3-01..M3-05.
 
-- [ ] **TB-05** — Stub `wildframe_focus` stage
+- [x] **TB-05** — Stub `wildframe_focus` stage
   - Deps: TB-02, TB-03 (for `PreviewImage` and `BBox`), TB-04
   - Size: S
   - **Introduces** the public `FocusResult` and `FocusConfig` types in `libs/focus/include/wildframe/focus/focus.hpp`. `FocusResult`: `{float focus_score, float motion_blur_score, float subject_size_percent, float keeper_score, std::array<bool, 4> edge_clipped}` per handoff §13 and docs/METADATA.md §3.2. `FocusConfig` is empty for now; real fields (`laplacian_saturation`, keeper weights, edge clipping tolerance) land with M4-02 / M4-04 / M4-05 in the same PR that parses those TOML keys.
