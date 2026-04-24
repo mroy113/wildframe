@@ -108,6 +108,15 @@ marginal benefit from an alternative.
   discards is exactly what the reader needs to navigate the code.
   If a descriptive name feels too long, find a better short word —
   do not shrink to one letter.
+- **Spell out common C++ shorthand.** The same readability argument
+  extends past single letters to the abbreviations that are longer
+  but still discard meaning: prefer `context`, `config`, `error`,
+  `buffer`, `iterator`, `orchestrator` over `ctx`, `cfg`, `err`,
+  `buf`, `it`, `orch`. Applies to parameters, locals (even one-off),
+  and fields. Carve-outs stay the same as the single-letter rule
+  above, and the standard library's own short names
+  (`std::size_t`, `std::uint8_t`, etc.) are not the target — the
+  rule is about hand-rolled abbreviations, not established idioms.
 
 ### 2.2 Header ordering
 
@@ -430,6 +439,43 @@ ln -s ../../../cmake/clang-tidy-tests.yaml libs/<module>/tests/.clang-tidy
   }
   ```
 
+### 2.14 Namespace aliases
+
+Reserve `namespace short = long::qualified::path;` for files that
+genuinely juggle **four or more** distinct namespaces with repeated
+use. In the common 1–3 namespace case, write the fully-qualified
+`long::qualified::Symbol` at the call site. Fully-qualified names
+read unambiguously without the one-hop indirection of tracking what
+`short` resolves to; the verbosity cost is trivial for a small
+fixed vocabulary.
+
+Does not apply to the standard library (`std::`) or to a
+`using`-declaration for a single frequently-used symbol
+(`using std::string_view;` at function scope).
+
+### 2.15 Aggregates with methods trip clang-tidy
+
+A `struct` with **public data members plus a member function** —
+even a trivial `[[nodiscard]] constexpr T Foo() const noexcept` —
+trips `misc-non-private-member-variables-in-classes` (and its alias
+`cppcoreguidelines-non-private-member-variables-in-classes`). Pure
+aggregates (public members only, no methods) are exempt, as are
+proper classes (private fields with `snake_case_` trailing
+underscore).
+
+When a value-type struct would benefit from a helper computation,
+write the helper as a **free function in the owning namespace**.
+Call-site ergonomics are identical (`Area(box)` reads as well as
+`box.Area()`), the struct stays a pure aggregate, and no
+suppression is needed.
+
+A member method on a public-field struct is the signal to either
+(a) add invariants — convert to a proper class with private fields
+and an accessor — or (b) extract the helper as a free function.
+Don't suppress the check with a `NOLINT` or a project-wide
+clang-tidy override: the check is correctly flagging a real
+ambiguity about whether the type carries invariants.
+
 ---
 
 ## 3. Exception policy
@@ -722,3 +768,62 @@ Test cases that do **not** reach any logging code — a pure
 value-type / math-function test — need neither `Init` nor a fixture
 class. `ctest`-level log thresholds are the warn-or-higher defaults
 from §4.2.
+
+---
+
+## 5. Commenting discipline
+
+### 5.1 Default to no comments
+
+The code is the primary documentation. Only add a comment when the
+**WHY is non-obvious** — a hidden constraint, a subtle invariant, a
+workaround for a specific bug, behavior that would surprise a
+reader. If removing the comment wouldn't confuse a future reader,
+don't write it.
+
+Don't explain WHAT the code does — well-named identifiers already
+do that. Don't reference the current task, fix, or callers ("used
+by X", "added for the Y flow", "handles the case from issue #123")
+— those belong in the PR description and rot as the codebase
+evolves.
+
+### 5.2 Don't narrate standard idioms
+
+When a piece of code is the standard way to do a thing — checking
+`opt.has_value()` before `*opt`, moving into a container, a
+destructor that just frees a resource, a range-for over a container
+— don't write a comment explaining why. The comment restates what
+any fluent reader already knows.
+
+The subtle trap: when the code is there because a linter flagged
+the alternative, it's tempting to narrate that provenance ("this
+`has_value()` check exists to satisfy
+`bugprone-unchecked-optional-access`"). Skip it. The resulting
+code is the idiom independently of what prompted the fix, so the
+reader doesn't need to know what prompted it. Before writing a
+comment that starts with "the `X()` check exists to satisfy…" or
+"we `X` because clang-tidy…", ask whether the resulting code is
+what a fluent C++ reader would write unprompted. If yes, delete
+the comment.
+
+### 5.3 Acronyms and library shorthand in prose
+
+Expand acronyms and library-specific shorthand on first use in
+each comment block or Doxygen header: "non-max suppression" on
+first mention (then "NMS" in the rest of the paragraph is fine),
+"ONNX Runtime's `Ort::Exception`" rather than bare
+`Ort::Exception`, "intersection-over-union threshold" rather than
+"IoU threshold". Universally-known short forms (`HTTP`, `JSON`,
+`URL`, `CPU`, `GPU`) don't need expansion.
+
+Same principle as §2.1's spell-out rule, applied to prose rather
+than identifiers: three keystrokes saved at the write site cost
+every reader a lookup.
+
+### 5.4 Public-header documentation
+
+Public headers (anything consumers include across a module /
+library boundary) carry brief Doxygen comments on their
+declarations: purpose, preconditions, the exception types the
+function may throw (per §3.2). Private headers and `.cpp` files
+follow §5.1 — no comments unless the WHY is non-obvious.
