@@ -18,6 +18,7 @@
 #include "wildframe/ingest/image_job.hpp"
 #include "wildframe/ingest/ingest_error.hpp"
 #include "wildframe/log/log.hpp"
+#include "wildframe/metadata/metadata_read_stage.hpp"
 #include "wildframe/orchestrator/orchestrator.hpp"
 #include "wildframe/orchestrator/pipeline_stage.hpp"
 #include "wildframe/raw/raw_stage.hpp"
@@ -106,10 +107,13 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
 
   // Stage list grows one entry per tracer-bullet stub as
   // TB-03..TB-07 land. TB-03 adds the raw preview stage; TB-04 adds
-  // the detect stub; TB-05 adds the focus stub; subsequent tasks
-  // append their own stages in the same pattern.
+  // the detect stub; TB-05 adds the focus stub; TB-06 adds the
+  // deterministic-metadata read stub between raw and detect per the
+  // handoff §12 pipeline order; subsequent tasks append their own
+  // stages in the same pattern.
   std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(wildframe::raw::MakeRawStage());
+  stages.push_back(wildframe::metadata::MakeMetadataReadStage());
   stages.push_back(wildframe::detect::MakeDetectStage());
   stages.push_back(wildframe::focus::MakeFocusStage());
   wildframe::orchestrator::Orchestrator orchestrator(std::move(stages),
