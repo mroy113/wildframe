@@ -476,6 +476,48 @@ Don't suppress the check with a `NOLINT` or a project-wide
 clang-tidy override: the check is correctly flagging a real
 ambiguity about whether the type carries invariants.
 
+For naming the positions of a small fixed-size array — e.g. four
+edge flags on `FocusResult::edge_clipped` — prefer
+`inline constexpr std::size_t kFoo = 0;` constants in the owning
+namespace over an `enum` or `enum class`. The constants plug
+straight into `std::array<bool, N>::at(kFoo)` without a cast, and
+sidestep `cppcoreguidelines-use-enum-class` plus
+`performance-enum-size` (which would force
+`enum class ... : std::uint8_t` and a `static_cast` at every
+indexing site for no semantic gain). Reach for a real enum only
+when the values are a closed type universe that should ban
+out-of-range construction.
+
+### 2.16 `std::move` only when it buys something
+
+`performance-move-const-arg` (and its alias `hicpp-move-const-arg`)
+flag `std::move(x)` when `x` is trivially copyable — the move
+degenerates into a copy and the `std::move` only adds noise. The
+check is on by default; don't suppress it.
+
+The mechanical rule: `std::move` is a transfer of ownership of a
+heap resource. If the type holds a `std::vector`, `std::string`,
+`std::unique_ptr`, or another non-trivial owning member, `std::move`
+genuinely elides a copy. If the type is all scalars plus
+trivially-copyable composites (`std::array<bool, N>`, POD structs),
+a plain copy is the same work and reads cleaner.
+
+Pipeline stage assignments make this concrete:
+
+```cpp
+// PreviewImage holds std::vector<std::uint8_t> — move is real.
+context.preview = std::move(preview);
+
+// DetectionResult holds std::vector<BBox> — move is real.
+context.detection = std::move(detection);
+
+// FocusResult is all floats + std::array<bool, 4> — plain copy.
+context.focus = focus;
+```
+
+When adding a new `StageContext` field and its producing stage,
+look at the new type's members before writing the assignment.
+
 ---
 
 ## 3. Exception policy
