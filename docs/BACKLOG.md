@@ -297,16 +297,17 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
 - [ ] **TB-03** — Stub `wildframe_raw` preview/decode
   - Deps: TB-02
   - Size: S
-  - **Introduces** the public `PreviewImage` type in `libs/raw/include/wildframe/raw/preview_image.hpp` — the output type of every raw-decode operation and the input type of `wildframe_detect` / `wildframe_focus`. Shape: `{int width, int height, std::vector<std::uint8_t> rgb_bytes}` or similar. Value type, Rule of Zero (STYLE §2.5). `BBox` — used by `decode_crop` — lives in `wildframe_detect`'s public header per TB-04 (it is produced by detect, consumed by raw and focus).
-  - **Introduces** `PreviewImage ExtractPreview(const std::filesystem::path&)` and `PreviewImage DecodeCrop(const std::filesystem::path&, const BBox&)` declarations in `libs/raw/include/wildframe/raw/raw.hpp` — the signatures M2-01 / M2-02 will satisfy unchanged.
+  - **Introduces** the public `PreviewImage` type in `libs/raw/include/wildframe/raw/preview_image.hpp` — the output type of every raw-decode operation and the input type of `wildframe_detect` / `wildframe_focus`. Shape: `{int width, int height, std::vector<std::uint8_t> rgb_bytes}` or similar. Value type, Rule of Zero (STYLE §2.5).
+  - **Also introduces the public `BBox` type early** in `libs/detect/include/wildframe/detect/bbox.hpp` — `{float x, float y, float width, float height}` with a member `float Area() const noexcept` — so `DecodeCrop`'s declaration can land in this task without a forward-declaration hack or an inverted TB-03↔TB-04 dep cycle. Re-used by `wildframe_raw::DecodeCrop` and `wildframe_focus::Score`. Publishes a minimal `libs/detect/CMakeLists.txt` exposing only the header (no sources, no ONNX Runtime link — that arrives with M3-01).
+  - **Introduces** `PreviewImage ExtractPreview(const std::filesystem::path&)` and `PreviewImage DecodeCrop(const std::filesystem::path&, const BBox&)` declarations in `libs/raw/include/wildframe/raw/raw.hpp` — the `ExtractPreview` signature M2-01 will satisfy unchanged. `DecodeCrop`'s final return type and pass mode are decided by M2-02 (which today names `CroppedImage` / by-value `BBox`); if M2-02 revises either, it updates its own backlog entry in the same PR per the Plan-change process.
   - Stub implementation returns a deterministic synthetic 256×256 RGB buffer filled with mid-gray (128,128,128). `DecodeCrop` returns a buffer sized to the requested bbox, same gray fill. No LibRaw link yet.
   - Publishes a `RawStage : PipelineStage` in `libs/raw/src/raw_stage.cpp` that calls `ExtractPreview` and writes the result into `StageContext`. TB-02's orchestrator receives an instance of this stage.
   - Tests (`libs/raw/tests/raw_test.cpp`): buffer dimensions, determinism across calls, non-empty-for-any-fixture-path. Replaced by M2-01 / M2-02.
 
 - [ ] **TB-04** — Stub `wildframe_detect` stage
-  - Deps: TB-02, TB-03 (for `PreviewImage`)
+  - Deps: TB-02, TB-03 (for `PreviewImage` and `BBox`)
   - Size: S
-  - **Introduces** the public `BBox` type in `libs/detect/include/wildframe/detect/bbox.hpp` — `{float x, float y, float width, float height}` with a member `float Area() const noexcept`. Re-used by `wildframe_raw::DecodeCrop` and `wildframe_focus::Score`.
+  - `BBox` landed with TB-03 (see its entry above) so `wildframe_raw::DecodeCrop`'s declaration could reference it without an inverted dep cycle. TB-04 builds on top of the existing header; it does not re-declare the type.
   - **Introduces** the public `DetectionResult` and `DetectConfig` types in `libs/detect/include/wildframe/detect/detect.hpp`. `DetectionResult` fields per handoff §13. `DetectConfig` is empty for now; the real fields (`confidence_threshold`, `iou_threshold`, `model`, `execution_provider`) land with M3-01 / M3-03 / M3-06 in the same PR that parses those TOML keys.
   - **Introduces** `DetectionResult Detect(const raw::PreviewImage&, const DetectConfig&)` declaration — the signature M3-05 will satisfy unchanged.
   - Stub returns `DetectionResult{bird_present=false, bird_count=0, bird_boxes={}, primary_subject_box=std::nullopt, detection_confidence=0.0F}` regardless of input. No ONNX Runtime link — the `wildframe_detect` CMake target does not depend on `onnxruntime` until M3-01 wires it.
@@ -314,7 +315,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Tests pin the sentinel return. Replaced by M3-01..M3-05.
 
 - [ ] **TB-05** — Stub `wildframe_focus` stage
-  - Deps: TB-02, TB-03 (for `PreviewImage`), TB-04 (for `BBox`)
+  - Deps: TB-02, TB-03 (for `PreviewImage` and `BBox`), TB-04
   - Size: S
   - **Introduces** the public `FocusResult` and `FocusConfig` types in `libs/focus/include/wildframe/focus/focus.hpp`. `FocusResult`: `{float focus_score, float motion_blur_score, float subject_size_percent, float keeper_score, std::array<bool, 4> edge_clipped}` per handoff §13 and docs/METADATA.md §3.2. `FocusConfig` is empty for now; real fields (`laplacian_saturation`, keeper weights, edge clipping tolerance) land with M4-02 / M4-04 / M4-05 in the same PR that parses those TOML keys.
   - **Introduces** `FocusResult Score(const raw::PreviewImage&, const std::optional<detect::BBox>&, const FocusConfig&)` — the signature M4-06 will satisfy unchanged.
