@@ -695,3 +695,30 @@ as control flow either. Two concrete rules:
 - **The orchestrator logs exactly once per job failure at `error`**
   when it writes the manifest row (M6-04). Modules below it do not
   also emit `error` for the same failure.
+
+### 4.8 Test fixtures
+
+Any GoogleTest case that exercises module code which calls
+`wildframe::log::<tag>.*()` must initialize a silent sink in the
+fixture's `SetUp` and tear it down in `TearDown` — otherwise the
+first log call aborts in `detail::native` when its tag lookup
+returns null (S0-14 contract: a missing tag is a programming error,
+not a runtime condition).
+
+```cpp
+class FooTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    wildframe::log::Config cfg;
+    cfg.enable_stdout = false;
+    cfg.level = spdlog::level::warn;
+    wildframe::log::Init(cfg);
+  }
+  void TearDown() override { wildframe::log::Shutdown(); }
+};
+```
+
+Test cases that do **not** reach any logging code — a pure
+value-type / math-function test — need neither `Init` nor a fixture
+class. `ctest`-level log thresholds are the warn-or-higher defaults
+from §4.2.
