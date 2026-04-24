@@ -30,6 +30,7 @@
 #include <string_view>
 
 #include "wildframe/detect/detect.hpp"
+#include "wildframe/focus/focus.hpp"
 #include "wildframe/ingest/image_job.hpp"
 #include "wildframe/raw/preview_image.hpp"
 
@@ -58,6 +59,11 @@ struct StageContext {
   /// `MetadataWriteStage` (TB-07 / M5-08). `std::nullopt` until
   /// `DetectStage` runs.
   std::optional<detect::DetectionResult> detection;
+
+  /// Focus / keeper scores from `wildframe_focus::Score`, populated
+  /// by `FocusStage` (TB-05) and consumed by `MetadataWriteStage`
+  /// (TB-07 / M5-08). `std::nullopt` until `FocusStage` runs.
+  std::optional<focus::FocusResult> focus;
 };
 
 /// Per-stage return value. Empty in the Sprint 2 skeleton: stages
