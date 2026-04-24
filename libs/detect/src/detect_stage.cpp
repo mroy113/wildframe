@@ -20,14 +20,6 @@ class DetectStage final : public orchestrator::PipelineStage {
 
   orchestrator::StageResult Process(
       orchestrator::StageContext& context) override {
-    // `RawStage` populates `context.preview` before this stage runs
-    // (see `docs/ARCHITECTURE.md` §3.2); the explicit `has_value()`
-    // check exists to satisfy
-    // `bugprone-unchecked-optional-access`, whose dataflow cannot
-    // model the stage-ordering invariant. Default-constructing
-    // `DetectionResult` already produces the stub's sentinel, so
-    // the impossible missing-preview case still yields a
-    // well-formed result.
     DetectionResult detection;
     if (context.preview.has_value()) {
       detection = Detect(*context.preview, DetectConfig{});

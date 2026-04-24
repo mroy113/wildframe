@@ -110,11 +110,11 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
   std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(wildframe::raw::MakeRawStage());
   stages.push_back(wildframe::detect::MakeDetectStage());
-  wildframe::orchestrator::Orchestrator orch(std::move(stages),
-                                             cfg.manifest_dir);
+  wildframe::orchestrator::Orchestrator orchestrator(std::move(stages),
+                                                     cfg.manifest_dir);
 
   try {
-    (void)orch.Run(jobs);
+    (void)orchestrator.Run(jobs);
   } catch (const std::exception& run_error) {
     // Per-image error isolation is M6-04; until then, a stage
     // exception aborts the batch and the CLI surfaces it as a

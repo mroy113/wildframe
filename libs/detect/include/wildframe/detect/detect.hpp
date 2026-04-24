@@ -4,14 +4,16 @@
 /// Public API for `wildframe_detect` (Module 3, FR-3, handoff §10).
 ///
 /// The detector consumes a decoded preview and returns the bird-class
-/// detections that pass confidence + NMS. TB-04 introduces the public
-/// types and the stub entry point that returns a deterministic
-/// "no birds" sentinel; M3-01..M3-05 wire the real YOLOv11 path
-/// behind the same signatures without changing this header.
+/// detections that pass the confidence threshold and non-max
+/// suppression. TB-04 introduces the public types and the stub entry
+/// point that returns a deterministic "no birds" sentinel;
+/// M3-01..M3-05 wire the real YOLOv11 path behind the same
+/// signatures without changing this header.
 ///
 /// Exception policy (`docs/STYLE.md` §3): the real implementation will
-/// translate `Ort::Exception` at this boundary to
-/// `wildframe::detect::DetectError`. The TB-04 stub never throws.
+/// translate exceptions raised by ONNX Runtime (`Ort::Exception`) at
+/// this boundary to `wildframe::detect::DetectError`. The TB-04 stub
+/// never throws.
 
 #include <cstdint>
 #include <optional>
@@ -22,13 +24,13 @@
 
 namespace wildframe::detect {
 
-/// Runtime-tunable detector knobs. Empty in TB-04 — real fields
-/// (`confidence_threshold`, `iou_threshold`, `model`,
-/// `execution_provider`) land with M3-01 / M3-03 / M3-06 in the same
-/// PR that widens TB-01's TOML parser with the matching `[detect]`
-/// keys. Declared now so the stub's signature is stable across the
-/// thickening pass (`docs/STYLE.md` §2.11 — the sole caller is the
-/// stub stage landing in this same task).
+/// Runtime-tunable detector knobs. Empty in TB-04 — the real
+/// thresholds, model selection, and execution-provider fields land
+/// with M3-01 / M3-03 / M3-06 in the same PR that widens TB-01's
+/// TOML parser with the matching `[detect]` keys. Declared now so
+/// the stub's signature is stable across the thickening pass
+/// (`docs/STYLE.md` §2.11 — the sole caller is the stub stage
+/// landing in this same task).
 struct DetectConfig {};
 
 /// Per-image detection output. Field shape mirrors the AI namespace
