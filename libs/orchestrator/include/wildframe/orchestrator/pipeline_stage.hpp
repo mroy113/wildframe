@@ -83,11 +83,11 @@ class PipelineStage {
   /// member `std::string`.
   [[nodiscard]] virtual std::string_view Name() const noexcept = 0;
 
-  /// Run the stage for one job. Reads upstream fields from `ctx`,
-  /// writes the stage's output back into `ctx`, and returns a
-  /// `StageResult` (currently empty). Throws the owning module's
-  /// Wildframe error type on expected per-image failure.
-  virtual StageResult Process(StageContext& ctx) = 0;
+  /// Run the stage for one job. Reads upstream fields from
+  /// `context`, writes the stage's output back into `context`, and
+  /// returns a `StageResult` (currently empty). Throws the owning
+  /// module's Wildframe error type on expected per-image failure.
+  virtual StageResult Process(StageContext& context) = 0;
 };
 
 }  // namespace wildframe::orchestrator

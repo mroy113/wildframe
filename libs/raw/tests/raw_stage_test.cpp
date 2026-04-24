@@ -28,21 +28,21 @@ TEST_F(RawStageTest, PopulatesPreviewOnStageContext) {
   ASSERT_NE(stage, nullptr);
   EXPECT_EQ(stage->Name(), "raw");
 
-  wildframe::orchestrator::StageContext ctx{
+  wildframe::orchestrator::StageContext context{
       .job = wildframe::ingest::ImageJob{.path = "/irrelevant.CR3"},
   };
-  ASSERT_FALSE(ctx.preview.has_value());
+  ASSERT_FALSE(context.preview.has_value());
 
-  (void)stage->Process(ctx);
+  (void)stage->Process(context);
 
-  ASSERT_TRUE(ctx.preview.has_value());
+  ASSERT_TRUE(context.preview.has_value());
   // Pair the ASSERT_TRUE with a plain `if` per docs/STYLE.md §2.13 —
   // bugprone-unchecked-optional-access cannot model gtest's
   // aborts-caller macro contract.
-  if (ctx.preview.has_value()) {
-    EXPECT_GT(ctx.preview->width, 0);
-    EXPECT_GT(ctx.preview->height, 0);
-    EXPECT_FALSE(ctx.preview->rgb_bytes.empty());
+  if (context.preview.has_value()) {
+    EXPECT_GT(context.preview->width, 0);
+    EXPECT_GT(context.preview->height, 0);
+    EXPECT_FALSE(context.preview->rgb_bytes.empty());
   }
 }
 

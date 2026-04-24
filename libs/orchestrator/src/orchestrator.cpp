@@ -32,11 +32,11 @@ RunResult Orchestrator::Run(std::span<const ingest::ImageJob> jobs) {
                          stages_.size());
 
   for (const auto& job : jobs) {
-    StageContext ctx{.job = job};
+    StageContext context{.job = job};
     for (const auto& stage : stages_) {
       WF_DEBUG(log::orchestrator, "stage {} running for {}", stage->Name(),
                job.path.string());
-      (void)stage->Process(ctx);
+      (void)stage->Process(context);
     }
     ++result.jobs_completed;
     if (on_progress_) {

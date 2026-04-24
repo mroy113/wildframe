@@ -19,11 +19,12 @@ class RawStage final : public orchestrator::PipelineStage {
     return kName;
   }
 
-  orchestrator::StageResult Process(orchestrator::StageContext& ctx) override {
-    PreviewImage preview = ExtractPreview(ctx.job.path);
+  orchestrator::StageResult Process(
+      orchestrator::StageContext& context) override {
+    PreviewImage preview = ExtractPreview(context.job.path);
     WF_DEBUG(log::raw, "extracted preview: {}x{} bytes={}", preview.width,
              preview.height, preview.rgb_bytes.size());
-    ctx.preview = std::move(preview);
+    context.preview = std::move(preview);
     return {};
   }
 

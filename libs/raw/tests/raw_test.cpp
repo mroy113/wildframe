@@ -42,10 +42,13 @@ TEST(ExtractPreviewStub, IsByteIdenticalAcrossCalls) {
   EXPECT_EQ(first.rgb_bytes, second.rgb_bytes);
 }
 
-TEST(DecodeCropStub, SizesBufferToBBox) {
+TEST(DecodeCropStub, SizesBufferToNormalizedBBox) {
+  // `BBox` fields are normalized fractions per `docs/METADATA.md`
+  // §3.1. The stub scales by its simulated full-res side length; for
+  // a 256-pixel side, a {0.25, 0.125} bbox decodes to 64×32.
   wildframe::detect::BBox bbox;
-  bbox.width = 64.0F;
-  bbox.height = 32.0F;
+  bbox.width = 0.25F;
+  bbox.height = 0.125F;
   const auto cropped = wildframe::raw::DecodeCrop("/a.CR3", bbox);
   EXPECT_EQ(cropped.width, 64);
   EXPECT_EQ(cropped.height, 32);
