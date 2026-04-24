@@ -26,9 +26,11 @@
 /// consumer to switch on a runtime tag for state that is statically
 /// known from the stage ordering.
 
+#include <optional>
 #include <string_view>
 
 #include "wildframe/ingest/image_job.hpp"
+#include "wildframe/raw/preview_image.hpp"
 
 namespace wildframe::orchestrator {
 
@@ -43,6 +45,12 @@ struct StageContext {
   /// (which would delete copy-assignment and trip
   /// `cppcoreguidelines-avoid-const-or-ref-data-members`).
   ingest::ImageJob job;
+
+  /// Decoded preview from `wildframe_raw::ExtractPreview`, populated
+  /// by `RawStage` (TB-03) and consumed by downstream stages
+  /// (TB-04 / M3-*, TB-05 / M4-*). `std::nullopt` until `RawStage`
+  /// runs — dereferencing before that is a programming error.
+  std::optional<raw::PreviewImage> preview;
 };
 
 /// Per-stage return value. Empty in the Sprint 2 skeleton: stages
