@@ -19,9 +19,6 @@
 
 namespace {
 
-namespace wfo = wildframe::orchestrator;
-namespace ingest = wildframe::ingest;
-
 // Orchestrator calls `log::orchestrator.info/debug(...)`; without an
 // initialized sink `detail::native` aborts. Every test case runs with
 // a silent logger per docs/STYLE.md §4.2 (ctest level).
@@ -38,10 +35,10 @@ class OrchestratorTest : public ::testing::Test {
   void TearDown() override { wildframe::log::Shutdown(); }
 };
 
-ingest::ImageJob MakeJob(const std::filesystem::path& path) {
-  return ingest::ImageJob{
+wildframe::ingest::ImageJob MakeJob(const std::filesystem::path& path) {
+  return wildframe::ingest::ImageJob{
       .path = path,
-      .format = ingest::Format::kCr3,
+      .format = wildframe::ingest::Format::kCr3,
       .size_bytes = std::nullopt,
       .content_hash = std::nullopt,
   };
@@ -52,7 +49,7 @@ struct StageCall {
   std::filesystem::path job_path;
 };
 
-class RecordingStage : public wfo::PipelineStage {
+class RecordingStage : public wildframe::orchestrator::PipelineStage {
  public:
   RecordingStage(std::string name, std::vector<StageCall>* log)
       : name_(std::move(name)), log_(log) {}
@@ -61,7 +58,8 @@ class RecordingStage : public wfo::PipelineStage {
     return name_;
   }
 
-  wfo::StageResult Process(wfo::StageContext& ctx) override {
+  wildframe::orchestrator::StageResult Process(
+      wildframe::orchestrator::StageContext& ctx) override {
     log_->push_back(StageCall{.stage_name = name_, .job_path = ctx.job.path});
     return {};
   }
@@ -71,13 +69,14 @@ class RecordingStage : public wfo::PipelineStage {
   std::vector<StageCall>* log_;
 };
 
-class ThrowingStage : public wfo::PipelineStage {
+class ThrowingStage : public wildframe::orchestrator::PipelineStage {
  public:
   [[nodiscard]] std::string_view Name() const noexcept override {
     return "throwing";
   }
 
-  wfo::StageResult Process(wfo::StageContext& /*ctx*/) override {
+  wildframe::orchestrator::StageResult Process(
+      wildframe::orchestrator::StageContext& /*ctx*/) override {
     throw std::runtime_error("stage failed");
   }
 };
@@ -85,40 +84,43 @@ class ThrowingStage : public wfo::PipelineStage {
 // --- Run mechanics --------------------------------------------------------
 
 TEST_F(OrchestratorTest, EmptyJobsAndEmptyStagesCompletesCleanly) {
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"});
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             std::filesystem::path{"/tmp/mf"});
 
   const auto result = orch.Run({});
-  EXPECT_EQ(result.status, wfo::RunStatus::kCompleted);
+  EXPECT_EQ(result.status, wildframe::orchestrator::RunStatus::kCompleted);
   EXPECT_EQ(result.jobs_total, 0U);
   EXPECT_EQ(result.jobs_completed, 0U);
 }
 
 TEST_F(OrchestratorTest, EmptyStageListStillCountsJobs) {
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"});
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             std::filesystem::path{"/tmp/mf"});
 
-  const std::vector<ingest::ImageJob> jobs = {
+  const std::vector<wildframe::ingest::ImageJob> jobs = {
       MakeJob("/tmp/a.CR3"),
       MakeJob("/tmp/b.CR3"),
   };
 
   const auto result = orch.Run(jobs);
-  EXPECT_EQ(result.status, wfo::RunStatus::kCompleted);
+  EXPECT_EQ(result.status, wildframe::orchestrator::RunStatus::kCompleted);
   EXPECT_EQ(result.jobs_total, 2U);
   EXPECT_EQ(result.jobs_completed, 2U);
 }
 
 TEST_F(OrchestratorTest, StagesInvokedInRegistrationOrderForEveryJob) {
   std::vector<StageCall> calls;
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(std::make_unique<RecordingStage>("first", &calls));
   stages.push_back(std::make_unique<RecordingStage>("second", &calls));
   stages.push_back(std::make_unique<RecordingStage>("third", &calls));
 
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"});
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             std::filesystem::path{"/tmp/mf"});
 
-  const std::vector<ingest::ImageJob> jobs = {
+  const std::vector<wildframe::ingest::ImageJob> jobs = {
       MakeJob("/tmp/a.CR3"),
       MakeJob("/tmp/b.CR3"),
   };
@@ -144,15 +146,16 @@ TEST_F(OrchestratorTest, StagesInvokedInRegistrationOrderForEveryJob) {
 }
 
 TEST_F(OrchestratorTest, ProgressCallbackFiresOncePerCompletedJob) {
-  std::vector<wfo::ProgressUpdate> updates;
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
+  std::vector<wildframe::orchestrator::ProgressUpdate> updates;
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
 
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"},
-                         [&](wfo::ProgressUpdate update) {
-                           updates.push_back(std::move(update));
-                         });
+  wildframe::orchestrator::Orchestrator orch(
+      std::move(stages), std::filesystem::path{"/tmp/mf"},
+      [&](wildframe::orchestrator::ProgressUpdate update) {
+        updates.push_back(std::move(update));
+      });
 
-  const std::vector<ingest::ImageJob> jobs = {
+  const std::vector<wildframe::ingest::ImageJob> jobs = {
       MakeJob("/tmp/a.CR3"),
       MakeJob("/tmp/b.CR3"),
       MakeJob("/tmp/c.CR3"),
@@ -170,10 +173,12 @@ TEST_F(OrchestratorTest, ProgressCallbackFiresOncePerCompletedJob) {
 }
 
 TEST_F(OrchestratorTest, NoProgressCallbackIsSafe) {
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"});
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             std::filesystem::path{"/tmp/mf"});
 
-  const std::vector<ingest::ImageJob> jobs = {MakeJob("/tmp/only.CR3")};
+  const std::vector<wildframe::ingest::ImageJob> jobs = {
+      MakeJob("/tmp/only.CR3")};
   const auto result = orch.Run(jobs);
 
   EXPECT_EQ(result.jobs_completed, 1U);
@@ -183,14 +188,15 @@ TEST_F(OrchestratorTest, NoProgressCallbackIsSafe) {
 
 TEST_F(OrchestratorTest, StageExceptionPropagatesAndAbortsBatch) {
   std::vector<StageCall> calls;
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(std::make_unique<RecordingStage>("before", &calls));
   stages.push_back(std::make_unique<ThrowingStage>());
   stages.push_back(std::make_unique<RecordingStage>("after", &calls));
 
-  wfo::Orchestrator orch(std::move(stages), std::filesystem::path{"/tmp/mf"});
+  wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                             std::filesystem::path{"/tmp/mf"});
 
-  const std::vector<ingest::ImageJob> jobs = {
+  const std::vector<wildframe::ingest::ImageJob> jobs = {
       MakeJob("/tmp/a.CR3"),
       MakeJob("/tmp/b.CR3"),
   };
@@ -207,9 +213,10 @@ TEST_F(OrchestratorTest, StageExceptionPropagatesAndAbortsBatch) {
 // --- Accessors ------------------------------------------------------------
 
 TEST_F(OrchestratorTest, ManifestDirAccessorReturnsConstructorInput) {
-  std::vector<std::unique_ptr<wfo::PipelineStage>> stages;
+  std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   const std::filesystem::path manifest_dir{"/tmp/wildframe-manifests"};
-  const wfo::Orchestrator orch(std::move(stages), manifest_dir);
+  const wildframe::orchestrator::Orchestrator orch(std::move(stages),
+                                                   manifest_dir);
 
   EXPECT_EQ(orch.manifest_dir(), manifest_dir);
 }
