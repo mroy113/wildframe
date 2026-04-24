@@ -372,6 +372,73 @@ a stage is a plan change when it introduces new namespaces, new
 third-party dependencies, or new user-visible behavior — not a
 silent registration call.
 
+### 4.5 Stage implementation pattern (landed in TB-03)
+
+Concrete `PipelineStage` subclasses live in their owning module per
+§4.1, but the naive "inherit from `orchestrator::PipelineStage` in a
+public header" creates a CMake dependency cycle — the leaf module
+would PUBLIC-link `wildframe::orchestrator` for the base class while
+the orchestrator already PUBLIC-links the leaf for `StageContext`
+field types (`PreviewImage`, `DetectionResult`, …). TB-03 settled on
+the factory pattern below; TB-04..TB-07 should follow it.
+
+```cpp
+// libs/<module>/include/wildframe/<module>/<module>_stage.hpp
+#include <memory>
+
+namespace wildframe::orchestrator {
+class PipelineStage;  // forward-declared; full definition only in .cpp
+}
+
+namespace wildframe::<module> {
+[[nodiscard]] std::unique_ptr<orchestrator::PipelineStage>
+    Make<Module>Stage();
+}
+```
+
+```cpp
+// libs/<module>/src/<module>_stage.cpp
+#include "wildframe/orchestrator/pipeline_stage.hpp"  // full definition
+
+namespace wildframe::<module> {
+namespace {
+class <Module>Stage final : public orchestrator::PipelineStage {
+  // Name(), Process() overrides go here.
+};
+}  // namespace
+
+std::unique_ptr<orchestrator::PipelineStage> Make<Module>Stage() {
+  return std::make_unique<<Module>Stage>();
+}
+}  // namespace wildframe::<module>
+```
+
+Resulting CMake edges for each module:
+
+- `wildframe_<module>` PRIVATE-links `wildframe::orchestrator` —
+  the base class is only needed inside the module's `.cpp`; the
+  factory header forward-declares it so consumers that include the
+  module's non-stage headers do not transitively pick up
+  orchestrator's include surface.
+- `wildframe_orchestrator` PUBLIC-links `wildframe::<module>` when
+  the module contributes a `StageContext` field type (e.g. `raw`
+  contributed `PreviewImage` in TB-03); every consumer of
+  `pipeline_stage.hpp` needs that include path.
+
+CMake accepts the resulting static-lib cycle; the final executable
+archives both sides and symbols resolve at link time. `src/` builds
+its stage vector by calling each factory in registration order:
+
+```cpp
+std::vector<std::unique_ptr<PipelineStage>> stages;
+stages.push_back(raw::MakeRawStage());
+// TB-04..TB-07 append their own.
+```
+
+The §1 dep graph omits the PRIVATE back-edges from leaves to
+orchestrator for readability; they are load-bearing for compilation
+but do not change the runtime "orchestrator drives leaves" contract.
+
 ---
 
 ## 5. Threading model
