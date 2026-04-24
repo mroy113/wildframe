@@ -12,6 +12,7 @@
 
 #include "cli_args.hpp"
 #include "config.hpp"
+#include "wildframe/detect/detect_stage.hpp"
 #include "wildframe/ingest/enumerate.hpp"
 #include "wildframe/ingest/image_job.hpp"
 #include "wildframe/ingest/ingest_error.hpp"
@@ -103,10 +104,12 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
   }
 
   // Stage list grows one entry per tracer-bullet stub as
-  // TB-03..TB-07 land. TB-03 adds the raw preview stage; subsequent
-  // tasks append their own stages in the same pattern.
+  // TB-03..TB-07 land. TB-03 adds the raw preview stage; TB-04 adds
+  // the detect stub; subsequent tasks append their own stages in the
+  // same pattern.
   std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(wildframe::raw::MakeRawStage());
+  stages.push_back(wildframe::detect::MakeDetectStage());
   wildframe::orchestrator::Orchestrator orch(std::move(stages),
                                              cfg.manifest_dir);
 

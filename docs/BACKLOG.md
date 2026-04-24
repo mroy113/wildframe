@@ -304,7 +304,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Publishes a `RawStage : PipelineStage` in `libs/raw/src/raw_stage.cpp` that calls `ExtractPreview` and writes the result into `StageContext`. TB-02's orchestrator receives an instance of this stage.
   - Tests (`libs/raw/tests/raw_test.cpp`): buffer dimensions, determinism across calls, non-empty-for-any-fixture-path. Replaced by M2-01 / M2-02.
 
-- [ ] **TB-04** — Stub `wildframe_detect` stage
+- [x] **TB-04** — Stub `wildframe_detect` stage
   - Deps: TB-02, TB-03 (for `PreviewImage` and `BBox`)
   - Size: S
   - `BBox` landed with TB-03 (see its entry above) so `wildframe_raw::DecodeCrop`'s declaration could reference it without an inverted dep cycle. TB-04 builds on top of the existing header; it does not re-declare the type.
