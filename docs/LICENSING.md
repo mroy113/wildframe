@@ -192,7 +192,8 @@ the same PR.
 | Dependency | Version | Upstream license | Notes |
 |---|---|---|---|
 | **libraw** | 0.22.0 | LGPL-2.1-or-later **OR** CDDL-1.0 (dual) | LGPL static-linking caveats do not apply when the binary is distributed under a GPL-compatible license (Wildframe's likely posture, §1). |
-| **exiv2** | 0.28.8 | GPL-2.0-or-later | **Strongest copyleft in the tree.** Static linking propagates GPL to the combined binary. This is the dominant constraint on §1. |
+| **exiv2** | 0.28.8 (`xmp` feature) | GPL-2.0-or-later | **Strongest copyleft in the tree.** Static linking propagates GPL to the combined binary. This is the dominant constraint on §1. The `xmp` feature is enabled because `wildframe_metadata` uses Exiv2's XMP API to read/write sidecars (TB-07, M5-*); without it, `XmpParser::encode/decode` are stubs that fail at runtime. |
+| **expat** | transitive via exiv2[xmp] | MIT | Pulled in by Exiv2's `xmp` feature — the XMP toolkit bundled with Exiv2 uses expat to parse RDF/XML packets. Permissive, no reciprocal obligation. |
 | **opencv4** | 4.12.0 (port-version 1) | Apache-2.0 | Modern OpenCV (≥ 4.5.0) is Apache-2.0. Compatible with GPL-3.0 distribution; **not** compatible with GPL-2.0-only (use `or-later`). |
 | **onnxruntime** | 1.23.2 | MIT | Permissive, no reciprocal obligation. |
 | **qtbase** | 6.10.2 | LGPL-3.0-only (with commercial alternative) | **Dynamically linked** per §2. Not included in the "statically linked" compatibility analysis above. |

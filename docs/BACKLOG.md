@@ -329,13 +329,13 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Stub returns a `DeterministicMetadata` with every `std::optional<T>` field as `std::nullopt` regardless of input. No Exiv2 read-side link yet (TB-07 separately introduces the Exiv2 *write* link; both sides converge when M5-02 thickens the read path).
   - Publishes a `MetadataReadStage : PipelineStage`. Tests pin that every field is `nullopt`. Replaced by M5-02..M5-04.
 
-- [ ] **TB-07** — Provenance-only XMP sidecar writer
+- [x] **TB-07** — Provenance-only XMP sidecar writer
   - Deps: TB-02
   - Size: M
   - Satisfies: FR-5 (partial), NFR-5
   - **Folds M5-06** — when TB-07 merges, flip M5-06's checkbox in the same PR with the commit note "landed as part of TB-07".
   - Links `wildframe_metadata` against Exiv2 for the first time. Registers the `wildframe_provenance:*` namespace per handoff §13 + [docs/METADATA.md §4](METADATA.md). Writes `<raw>.xmp` via Exiv2's high-level API using the temp-file-plus-rename idiom (M5-08 will reuse this machinery unchanged).
-  - Populated provenance fields on every sidecar: `analysis_timestamp` (ISO-8601, local), `pipeline_version` (from a single compile-time constant — add `libs/metadata/include/wildframe/metadata/version.hpp` with `constexpr std::string_view kPipelineVersion = "0.0.0";`), `detector_model_name = "stub"`, `detector_model_version = "0.0.0"`, `focus_algorithm_version = "0.0.0"`.
+  - Populated provenance fields on every sidecar: `analysis_timestamp` (ISO-8601 UTC with `Z` suffix per [docs/METADATA.md §7.2](METADATA.md) — earlier draft of this entry said "local" but the external-tool contract in METADATA.md §4 / §7.2 is UTC; writer captures `system_clock::now()` once at stage construction so every sidecar in a run reports the same instant per METADATA.md §7.2), `pipeline_version` (from a single compile-time constant — `libs/metadata/include/wildframe/metadata/version.hpp` defines `constexpr std::string_view kPipelineVersion = "0.0.0";`), `detector_model_name = "stub"`, `detector_model_version = "0.0.0"`, `focus_algorithm_version = "0.0.0"`. The three thickening-pass-dependent provenance fields from [docs/METADATA.md §4](METADATA.md) (`detection_confidence_threshold`, `detection_iou_threshold`, `execution_provider`) remain absent until M3-* / M4-* ship real `DetectConfig` / `FocusConfig` values — writing them with sentinel defaults now would commit meaningless values to disk.
   - **`wildframe:*` AI-namespace and `wildframe_user:*` override namespace are deliberately deferred** to M5-05 / M5-07 / M5-08 / M5-10. The AI namespace would only carry sentinels anyway, and writing sentinels as real XMP pollutes the round-trip test surface for the thickening passes.
   - Publishes a `MetadataWriteStage : PipelineStage` in `libs/metadata/src/metadata_write_stage.cpp`. The stage pulls whatever is in `StageContext` (stub DetectionResult, stub FocusResult) and writes **only** provenance fields, ignoring the AI data for now. M5-08 rewires the stage to emit AI fields once the AI namespace exists.
   - Tests: write a sidecar for a fixture CR3, reopen it with Exiv2, verify the five provenance fields are present and correctly typed. Temp-file-plus-rename atomicity test: kill a write mid-flight (simulate via an injected throwing sink or by crashing on a callback) and confirm the original file is intact.
@@ -574,7 +574,7 @@ Thickening pass — **extends** the **TB-07** provenance-only writer with the `w
   - Satisfies: FR-5, NFR-4
   - Register namespace and field definitions with Exiv2 at startup. Mirror `docs/METADATA.md` exactly.
 
-- [ ] **M5-06** — `wildframe_provenance:*` namespace
+- [x] **M5-06** — `wildframe_provenance:*` namespace
   - Deps: M5-05
   - Size: S
   - Satisfies: NFR-5

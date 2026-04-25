@@ -1,5 +1,6 @@
 #include "run.hpp"
 
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -19,6 +20,7 @@
 #include "wildframe/ingest/ingest_error.hpp"
 #include "wildframe/log/log.hpp"
 #include "wildframe/metadata/metadata_read_stage.hpp"
+#include "wildframe/metadata/metadata_write_stage.hpp"
 #include "wildframe/orchestrator/orchestrator.hpp"
 #include "wildframe/orchestrator/pipeline_stage.hpp"
 #include "wildframe/raw/raw_stage.hpp"
@@ -109,13 +111,19 @@ int Run(int argc, const char* const* argv, std::ostream& err) {
   // TB-03..TB-07 land. TB-03 adds the raw preview stage; TB-04 adds
   // the detect stub; TB-05 adds the focus stub; TB-06 adds the
   // deterministic-metadata read stub between raw and detect per the
-  // handoff §12 pipeline order; subsequent tasks append their own
-  // stages in the same pattern.
+  // handoff §12 pipeline order; TB-07 appends the provenance-only
+  // metadata write as the terminal per-image stage. `analysis_timestamp`
+  // is captured once here (STYLE §2.12 single-clock-boundary) so every
+  // sidecar written this run reports the same instant per METADATA.md
+  // §7.2.
+  const auto analysis_timestamp = std::chrono::system_clock::now();
   std::vector<std::unique_ptr<wildframe::orchestrator::PipelineStage>> stages;
   stages.push_back(wildframe::raw::MakeRawStage());
   stages.push_back(wildframe::metadata::MakeMetadataReadStage());
   stages.push_back(wildframe::detect::MakeDetectStage());
   stages.push_back(wildframe::focus::MakeFocusStage());
+  stages.push_back(
+      wildframe::metadata::MakeMetadataWriteStage(analysis_timestamp));
   wildframe::orchestrator::Orchestrator orchestrator(std::move(stages),
                                                      cfg.manifest_dir);
 
