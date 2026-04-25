@@ -25,7 +25,9 @@ Work the next task or tracer-bullet slice from `docs/BACKLOG.md`.
 
 ## After the PR is open
 
-Poll CI every 20s and surface status. On failure: diagnose, propose a fix, wait for my go-ahead before pushing further commits. Do not silently retry.
+Poll CI and surface status. Cadence: a single ScheduleWakeup at ~240s (inside the 5-min prompt cache window) usually catches a 3–5 min CI run in one extra turn — preferable to looping at 20s, which burns tool-call turns. Drop to 60–120s only when you expect status to flip soon (waiting on a single retry, etc.). On failure: diagnose, propose a fix, wait for my go-ahead before pushing further commits. Do not silently retry.
+
+**Stop after the PR is green.** Do not pick up the next backlog task without an explicit go-ahead. One `/tracer` invocation = one task. After surfacing the green PR, wait for my next instruction (could be "done", "next", merge feedback, a different task, or something else entirely).
 
 ## When I say "done" (or similar)
 
