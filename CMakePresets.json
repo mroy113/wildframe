@@ -9,7 +9,7 @@
         {
             "name": "_base",
             "hidden": true,
-            "description": "Shared base: Ninja generator, vcpkg toolchain, exported compile_commands.json, and a single vcpkg install tree at build/_vcpkg_installed shared across every preset that inherits this one. Sharing is safe only while every inheriting preset uses the same triplet (arm64-osx today) with no ABI-affecting flags. The asan preset (S1-02) shares this tree because ASan and UBSan are ABI-compatible with non-instrumented static libraries; a future tsan preset (S1-03) must give itself its own _vcpkg_installed_<variant> path because TSan does require every translation unit to be instrumented.",
+            "description": "Shared base: Ninja generator, vcpkg toolchain, exported compile_commands.json, and a single vcpkg install tree at build/_vcpkg_installed shared across every preset that inherits this one. Sharing is safe only while every inheriting preset uses the same triplet (arm64-osx today) with no ABI-affecting flags. Debug, release, and tidy share the tree. The asan preset (S1-02) opted out: libc++'s std::vector container annotations get out of sync when an uninstrumented dependency mutates a vector through the same allocator (Exiv2::XmpData::add hit this), so asan now uses arm64-osx-asan with its own _vcpkg_installed_asan tree. A future tsan preset (S1-03) will follow the same pattern.",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
@@ -48,9 +48,12 @@
         {
             "name": "asan",
             "displayName": "AddressSanitizer + UndefinedBehaviorSanitizer",
-            "description": "Debug build with ASan + UBSan. Wired into CI by S1-02. `-fno-sanitize-recover=undefined` turns every UBSan finding into an abort so the CI step fails; ASan already aborts by default. Inherits the _base vcpkg install tree — see that preset's description for the ABI-compatibility note.",
+            "description": "Debug build with ASan + UBSan. Wired into CI by S1-02. `-fno-sanitize-recover=undefined` turns every UBSan finding into an abort so the CI step fails; ASan already aborts by default. Uses its own _vcpkg_installed_asan tree built via the arm64-osx-asan custom triplet so dependency code is instrumented too — required to keep libc++'s container annotations consistent across third-party calls into our vectors (see cmake/triplets/arm64-osx-asan.cmake). The first cold build under this preset rebuilds the entire vcpkg closure with sanitizer flags; subsequent runs hit the GHA cache.",
             "inherits": "debug",
             "cacheVariables": {
+                "VCPKG_INSTALLED_DIR": "${sourceDir}/build/_vcpkg_installed_asan",
+                "VCPKG_TARGET_TRIPLET": "arm64-osx-asan",
+                "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
             }

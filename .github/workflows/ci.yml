@@ -114,6 +114,21 @@ jobs:
           restore-keys: |
             vcpkg-installed-macos14-${{ runner.arch }}-
 
+      # The asan preset uses the arm64-osx-asan custom triplet (see
+      # cmake/triplets/arm64-osx-asan.cmake), which builds the entire vcpkg
+      # closure with -fsanitize=address,undefined. That ABI is incompatible
+      # with the shared _vcpkg_installed tree above, so it gets its own
+      # cache. Keyed on the triplet file too so a sanitizer-flag change
+      # invalidates the cache. Cold first build is multi-hour; later runs
+      # restore from cache in seconds.
+      - name: Cache vcpkg_installed_asan tree
+        uses: actions/cache@v4
+        with:
+          path: build/_vcpkg_installed_asan
+          key: vcpkg-installed-asan-macos14-${{ runner.arch }}-${{ hashFiles('vcpkg.json', 'cmake/PlatformMinimums.cmake', 'cmake/platforms/macos.cmake', 'cmake/triplets/arm64-osx-asan.cmake') }}
+          restore-keys: |
+            vcpkg-installed-asan-macos14-${{ runner.arch }}-
+
       - name: Cache fetched assets (ONNX models + CR3 fixtures)
         uses: actions/cache@v4
         with:
