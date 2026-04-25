@@ -153,6 +153,24 @@ jobs:
       - name: Test (debug)
         run: ctest --preset debug
 
+      # The asan preset's vcpkg closure compiles the entire dep tree (Qt 6,
+      # OpenCV, ONNX Runtime, Exiv2, …) from source under sanitizer flags.
+      # Sanitizer-instrumented intermediates are larger than non-instrumented
+      # ones, and per-port buildtrees compound across the closure — peak disk
+      # under the arm64-osx-asan triplet exceeds the ~14 GB free on a stock
+      # macos-14 runner once the debug-side leftovers are added in. Run
+      # 24940390044 (PR #54) hit `IOException: No space left on device` for
+      # exactly this reason. The asan preset also passes
+      # `--clean-buildtrees-after-build;--clean-packages-after-build` via
+      # VCPKG_INSTALL_OPTIONS (CMakePresets.json) so its own port builds
+      # self-clean per port; this step covers the debug-side intermediates
+      # the previous run wrote before that flag existed.
+      - name: Free disk before asan vcpkg install
+        run: |
+          df -h /
+          rm -rf "$VCPKG_ROOT/buildtrees" "$VCPKG_ROOT/packages"
+          df -h /
+
       # S1-02: ASan + UBSan gate. Runs after the debug test pass so formatting
       # and basic correctness fail-fast before we pay the sanitizer build. Any
       # sanitizer finding aborts the process (ASan by default, UBSan via
