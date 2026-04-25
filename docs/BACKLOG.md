@@ -322,7 +322,7 @@ Per [docs/ARCHITECTURE.md §6](ARCHITECTURE.md) ("Every module → `tomlplusplus
   - Stub returns `FocusResult{focus_score=0.0F, motion_blur_score=0.0F, subject_size_percent=0.0F, keeper_score=0.0F, edge_clipped={false,false,false,false}}` regardless of input. No OpenCV link — the `wildframe_focus` CMake target does not depend on `opencv4` until M4-01 wires it.
   - Publishes a `FocusStage : PipelineStage`. Tests pin the sentinel return. Replaced by M4-01..M4-07.
 
-- [ ] **TB-06** — Stub `wildframe_metadata` EXIF reader
+- [x] **TB-06** — Stub `wildframe_metadata` EXIF reader
   - Deps: TB-02, M5-01
   - Size: S
   - **Introduces** `metadata::DeterministicMetadata ReadExif(const std::filesystem::path&)` declaration in `libs/metadata/include/wildframe/metadata/metadata.hpp` — the signature M5-02 will satisfy unchanged.

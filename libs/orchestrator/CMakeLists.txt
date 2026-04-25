@@ -9,14 +9,14 @@ target_include_directories(wildframe_orchestrator
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-# `wildframe::ingest`, `wildframe::raw`, `wildframe::detect`, and
-# `wildframe::focus` are PUBLIC because `ImageJob`,
-# `raw::PreviewImage`, `detect::DetectionResult`, and
-# `focus::FocusResult` all appear in `pipeline_stage.hpp`'s
-# `StageContext` — every consumer of that header needs their include
-# paths. `raw` landed with TB-03; `detect` landed with TB-04;
-# `focus` landed with TB-05. TB-06 / TB-07 add `metadata` under the
-# same rationale.
+# `wildframe::ingest`, `wildframe::raw`, `wildframe::detect`,
+# `wildframe::focus`, and `wildframe::metadata` are PUBLIC because
+# `ImageJob`, `raw::PreviewImage`, `detect::DetectionResult`,
+# `focus::FocusResult`, and `metadata::DeterministicMetadata` all
+# appear in `pipeline_stage.hpp`'s `StageContext` — every consumer of
+# that header needs their include paths. `raw` landed with TB-03;
+# `detect` landed with TB-04; `focus` landed with TB-05; `metadata`
+# landed with TB-06.
 # `wildframe::log` is PRIVATE — no public header re-exports spdlog.
 target_link_libraries(wildframe_orchestrator
     PUBLIC
@@ -24,6 +24,7 @@ target_link_libraries(wildframe_orchestrator
         wildframe::raw
         wildframe::detect
         wildframe::focus
+        wildframe::metadata
     PRIVATE
         wildframe::log
 )

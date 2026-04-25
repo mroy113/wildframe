@@ -32,6 +32,7 @@
 #include "wildframe/detect/detect.hpp"
 #include "wildframe/focus/focus.hpp"
 #include "wildframe/ingest/image_job.hpp"
+#include "wildframe/metadata/deterministic_metadata.hpp"
 #include "wildframe/raw/preview_image.hpp"
 
 namespace wildframe::orchestrator {
@@ -53,6 +54,14 @@ struct StageContext {
   /// (TB-04 / M3-*, TB-05 / M4-*). `std::nullopt` until `RawStage`
   /// runs — dereferencing before that is a programming error.
   std::optional<raw::PreviewImage> preview;
+
+  /// Deterministic camera/shot metadata from
+  /// `wildframe_metadata::ReadExif`, populated by
+  /// `MetadataReadStage` (TB-06) and consumed by
+  /// `MetadataWriteStage` (TB-07 / M5-08) as the source of the
+  /// standard-namespace EXIF fields it mirrors onto the sidecar.
+  /// `std::nullopt` until `MetadataReadStage` runs.
+  std::optional<metadata::DeterministicMetadata> exif;
 
   /// Detector output from `wildframe_detect::Detect`, populated by
   /// `DetectStage` (TB-04) and consumed by `FocusStage` (TB-05) and
